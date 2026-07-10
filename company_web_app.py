@@ -556,6 +556,7 @@ def _infographic_slides(job_id: str, payload: Dict[str, Any]):
             except Exception as exc:  # noqa: BLE001 - 다른 이미지 생성은 계속 살린다
                 errors.append(f"{idx + 1}: {exc}")
                 _set_job(job_id, progress=pct, department="design", message=f"인포그래픽 {idx + 1} 실패, 나머지 진행")
+    items.sort(key=lambda item: int(item.get("scene_no") or 999))
 
     with _lock:
         _last.update({"infographic_slides": items})
