@@ -1,7 +1,7 @@
 const $ = (id) => document.getElementById(id);
 let currentJob = null;
 let pollTimer = null;
-let lastData = { raw_data: "", script: "", thumbnail_copy: "" };
+let lastData = { raw_data: "", script: "", thumbnail_copy: "", thumbnail_concepts: [], thumbnail_images: [] };
 const deptOrder = ["planning","research","writing","review","design","video","shipping"];
 const activeLines = {
   research: ["lineResearchWrite"], writing: ["linePlanWrite","lineResearchWrite"], review: ["lineWriteReview"], design: ["lineReviewDesign"], video: ["lineReviewDesign"], shipping: ["lineDesignShip","lineReviewShip"]
@@ -17,7 +17,7 @@ function setDept(active, done=[]){
   (activeLines[active]||[]).forEach(id=>{ const el=$(id); if(el) el.classList.add('active'); });
 }
 function doneBefore(active){ const i=deptOrder.indexOf(active); return i>0 ? deptOrder.slice(0,i) : []; }
-function payload(engine){ return { stock_name: $('stockName').value.trim(), stock_code: $('stockCode').value.trim(), format_name: $('formatName').value, custom_topic: $('customTopic').value, output_dir: $('outputDir').value, engine: engine || 'chain', raw_data: lastData.raw_data, script: lastData.script, thumbnail_copy: lastData.thumbnail_copy }; }
+function payload(engine){ return { stock_name: $('stockName').value.trim(), stock_code: $('stockCode').value.trim(), format_name: $('formatName').value, custom_topic: $('customTopic').value, output_dir: $('outputDir').value, engine: engine || 'chain', raw_data: lastData.raw_data, script: lastData.script, thumbnail_copy: lastData.thumbnail_copy, concepts: selectedConcepts() }; }
 async function api(path, body){ const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); const j=await r.json(); if(!j.ok) throw new Error(j.error||'요청 실패'); return j; }
 async function startJob(path, body){
   const res=await api(path, body); currentJob=res.job_id; $('globalStatus').textContent='작업 시작'; $('jobTitle').textContent='작업 #' + currentJob; $('progressBar').style.width='3%'; log('제작 의뢰 접수: '+path); document.querySelectorAll('button').forEach(b=>b.classList.add('busy')); poll();
@@ -35,7 +35,55 @@ async function poll(){
   } catch(e){ cleanupButtons(); log('조회 오류: '+e.message); alert(e.message); }
 }
 function cleanupButtons(){ document.querySelectorAll('button').forEach(b=>b.classList.remove('busy')); }
-function handleResult(job){ const r=job.result||{}; if(r.raw_data){ lastData.raw_data=r.raw_data; $('rawOut').value=r.raw_data; } if(r.script){ lastData.script=r.script; $('scriptOut').value=r.script; } if(r.thumbnail_copy){ lastData.thumbnail_copy=r.thumbnail_copy; $('thumbOut').value=r.thumbnail_copy; } if(Array.isArray(r.results)){ $('thumbOut').value = JSON.stringify(r,null,2); } if(r.path){ log('저장 파일: '+r.path); } }
+function handleResult(job){
+  const r=job.result||{};
+  if(r.raw_data){ lastData.raw_data=r.raw_data; $('rawOut').value=r.raw_data; }
+  if(r.script){ lastData.script=r.script; $('scriptOut').value=r.script; }
+  if(r.thumbnail_copy){ lastData.thumbnail_copy=r.thumbnail_copy; $('thumbOut').value=r.thumbnail_copy; }
+  if(Array.isArray(r.concepts)){ lastData.thumbnail_concepts=r.concepts; renderConcepts(r.concepts); }
+  if(Array.isArray(r.items)){ lastData.thumbnail_images=r.items; renderGallery(r.items); $('thumbOut').value = JSON.stringify(r,null,2); }
+  if(Array.isArray(r.results)){ $('thumbOut').value = JSON.stringify(r,null,2); }
+  if(r.path){ log('저장 파일: '+r.path); }
+}
+
+function renderConcepts(concepts){
+  const root=$('conceptStrip');
+  if(!root) return;
+  if(!concepts.length){ root.innerHTML='<div class="empty-card">컨셉 후보가 없습니다.</div>'; return; }
+  root.innerHTML=concepts.map((c,idx)=>`
+    <div class="concept-card ${c.selected?'selected':''}" data-idx="${idx}">
+      <span class="score">${c.ctr_score||80}</span>
+      <b>${escapeHtml(c.badge||'긴급속보')}</b>
+      <strong>${escapeHtml(c.main||'메인문구')}</strong>
+      <em>${escapeHtml(c.sub||'서브문구')}</em>
+      <small>${escapeHtml(c.style||'프리미엄')} · 후보 ${idx+1}</small>
+    </div>
+  `).join('');
+  root.querySelectorAll('.concept-card').forEach(card=>{
+    card.onclick=()=>{
+      const idx=Number(card.dataset.idx);
+      lastData.thumbnail_concepts[idx].selected=!lastData.thumbnail_concepts[idx].selected;
+      renderConcepts(lastData.thumbnail_concepts);
+    };
+  });
+}
+
+function selectedConcepts(){
+  return (lastData.thumbnail_concepts||[]).filter(c=>c.selected);
+}
+
+function renderGallery(items){
+  const root=$('thumbGallery');
+  if(!root) return;
+  if(!items.length){ root.innerHTML='<div class="empty-card">이미지 결과가 없습니다.</div>'; return; }
+  root.innerHTML=items.map((item,idx)=>{
+    const url=item.url||'';
+    return `<div class="thumb-card">
+      ${url?`<img src="${escapeHtml(url)}" alt="thumbnail ${idx+1}" />`:'<div class="empty-card">이미지 없음</div>'}
+      <a href="${escapeHtml(url)}" target="_blank">시안 ${idx+1} 열기 · ${escapeHtml(item.style||'')}</a>
+    </div>`;
+  }).join('');
+}
 async function loadConfig(){
   const r=await fetch('/api/config'); const j=await r.json(); if(!j.ok) throw new Error(j.error||'설정 로드 실패');
   const preset=$('preset'); preset.innerHTML=''; Object.entries(j.presets).forEach(([name,code])=>{ const o=document.createElement('option'); o.value=name; o.textContent=name; o.dataset.code=code; preset.appendChild(o); });
@@ -48,7 +96,10 @@ $('collectBtn').onclick=()=>startJob('/api/collect', payload());
 $('scriptBtn').onclick=()=>startJob('/api/script', payload('chain'));
 $('fastScriptBtn').onclick=()=>startJob('/api/script', payload('fast_openai'));
 $('thumbCopyBtn').onclick=()=>startJob('/api/thumbnail-copy', payload());
-$('thumbImgBtn').onclick=()=>startJob('/api/thumbnail-images', {...payload(), count:3});
+$('thumbConceptBtn').onclick=()=>startJob('/api/thumbnail-concepts', {...payload(), count:8});
+$('thumbImgBtn').onclick=()=>startJob('/api/thumbnail-images', {...payload(), count:Math.max(1, selectedConcepts().length || 3)});
 $('openOutputBtn').onclick=()=>api('/api/open-output',{}).then(r=>log('폴더 열기: '+r.path)).catch(e=>alert(e.message));
+$('selectAllConcepts').onclick=()=>{ lastData.thumbnail_concepts=(lastData.thumbnail_concepts||[]).map(c=>({...c,selected:true})); renderConcepts(lastData.thumbnail_concepts); };
+$('clearConcepts').onclick=()=>{ lastData.thumbnail_concepts=(lastData.thumbnail_concepts||[]).map(c=>({...c,selected:false})); renderConcepts(lastData.thumbnail_concepts); };
 loadConfig().catch(e=>alert(e.message));
 setDept(null,[]);

@@ -1,0 +1,164 @@
+/* 디자인실 고도화: CTR 컨셉 회의 + 썸네일 갤러리 */
+.workspace {
+  grid-template-rows: auto minmax(330px, 1fr) 116px 260px 220px;
+}
+
+.company-map {
+  min-height: 330px;
+}
+
+.thumbnail-lab {
+  background: rgba(17, 24, 39, .86);
+  border: 1px solid rgba(148, 163, 184, .18);
+  border-radius: 24px;
+  padding: 14px;
+  overflow: hidden;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .22);
+  backdrop-filter: blur(14px);
+}
+
+.lab-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.lab-head h3 {
+  margin: 2px 0 0;
+  font-size: 18px;
+}
+
+.lab-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.lab-actions button {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.concept-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 230px;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.concept-card {
+  position: relative;
+  background: #0b1220;
+  border: 1px solid #26354d;
+  border-radius: 18px;
+  padding: 12px;
+  min-height: 138px;
+  cursor: pointer;
+  transition: .18s transform, .18s border, .18s box-shadow;
+}
+
+.concept-card:hover {
+  transform: translateY(-2px);
+}
+
+.concept-card.selected {
+  border-color: #60a5fa;
+  box-shadow: 0 0 24px rgba(96, 165, 250, .18);
+}
+
+.concept-card .score {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  color: #bbf7d0;
+  background: #052e16;
+  border: 1px solid #14532d;
+  border-radius: 99px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.concept-card b {
+  display: block;
+  color: #fbbf24;
+  font-size: 12px;
+  margin-bottom: 10px;
+  padding-right: 56px;
+}
+
+.concept-card strong {
+  display: block;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.concept-card em {
+  display: block;
+  margin-top: 5px;
+  color: #bfdbfe;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.concept-card small {
+  display: block;
+  margin-top: 10px;
+  color: #94a3b8;
+}
+
+.gallery {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 220px;
+  gap: 10px;
+  overflow-x: auto;
+  padding-top: 2px;
+}
+
+.thumb-card {
+  background: #0b1220;
+  border: 1px solid #26354d;
+  border-radius: 18px;
+  padding: 9px;
+}
+
+.thumb-card img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #111827;
+}
+
+.thumb-card a {
+  display: block;
+  margin-top: 8px;
+  color: #bfdbfe;
+  font-size: 12px;
+  text-decoration: none;
+  font-weight: 900;
+}
+
+.empty-card {
+  display: grid;
+  place-items: center;
+  min-height: 92px;
+  border: 1px dashed #334155;
+  border-radius: 18px;
+  color: #94a3b8;
+  padding: 16px;
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .workspace {
+    grid-template-rows: auto 520px auto auto auto;
+  }
+
+  .thumbnail-lab {
+    min-height: 260px;
+  }
+}

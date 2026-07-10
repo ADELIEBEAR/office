@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>주식 AI 제작사</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="design_lab.css" />
 </head>
 <body>
   <div class="app-shell">
@@ -38,6 +39,7 @@
           <button class="primary" id="scriptBtn">② 작가팀 90점 대본</button>
           <button id="fastScriptBtn">⚡ 빠른 초안</button>
           <button id="thumbCopyBtn">✍ 디자인팀 문구</button>
+          <button id="thumbConceptBtn">🧪 CTR 컨셉 회의</button>
           <button id="thumbImgBtn">🎨 이미지 시안</button>
           <button id="openOutputBtn">📁 출고 폴더</button>
         </div>
@@ -83,6 +85,25 @@
         <div class="job-head"><b id="jobTitle">작업 로그</b><span id="jobProgress">0%</span></div>
         <div class="progress"><i id="progressBar"></i></div>
         <div class="log" id="log"></div>
+      </section>
+
+      <section class="thumbnail-lab">
+        <div class="lab-head">
+          <div>
+            <div class="eyebrow">DESIGN ROOM</div>
+            <h3>썸네일 제작실</h3>
+          </div>
+          <div class="lab-actions">
+            <button id="selectAllConcepts">전체 선택</button>
+            <button id="clearConcepts">선택 해제</button>
+          </div>
+        </div>
+        <div class="concept-strip" id="conceptStrip">
+          <div class="empty-card">대본 생성 후 CTR 컨셉 회의를 누르면 후보가 여기에 뜹니다.</div>
+        </div>
+        <div class="gallery" id="thumbGallery">
+          <div class="empty-card">이미지 시안을 생성하면 결과 갤러리가 여기에 표시됩니다.</div>
+        </div>
       </section>
 
       <section class="result-grid">

@@ -11,8 +11,9 @@ import uuid
 import webbrowser
 from pathlib import Path
 from typing import Any, Dict
+from urllib.parse import quote
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_file, send_from_directory
 
 import market_research as mr
 
@@ -22,7 +23,15 @@ OUTPUT_DIR = Path(getattr(mr, "OUTPUT_DIR", ROOT / "output"))
 
 app = Flask(__name__, static_folder=str(WEB_DIR), static_url_path="")
 _jobs: Dict[str, Dict[str, Any]] = {}
-_last: Dict[str, Any] = {"raw_data": "", "script": "", "thumbnail_copy": "", "stock_name": "삼성전자", "stock_code": "005930"}
+_last: Dict[str, Any] = {
+    "raw_data": "",
+    "script": "",
+    "thumbnail_copy": "",
+    "thumbnail_concepts": [],
+    "thumbnail_images": [],
+    "stock_name": "삼성전자",
+    "stock_code": "005930",
+}
 _lock = threading.Lock()
 
 PRESETS = {
@@ -162,15 +171,79 @@ def _thumbnail_copy(job_id: str, payload: Dict[str, Any]):
     return {"thumbnail_copy": text, "path": result.get("path") if isinstance(result, dict) else None, "chars": len(text)}
 
 
+def _path_to_output_url(path: str | None) -> str | None:
+    if not path:
+        return None
+    try:
+        p = Path(path).resolve()
+        return "/api/output-file?path=" + quote(str(p))
+    except Exception:
+        return None
+
+
+def _thumbnail_concepts(job_id: str, payload: Dict[str, Any]):
+    stock_name = (payload.get("stock_name") or _last.get("stock_name") or "삼성전자").strip()
+    script = payload.get("script") or _last.get("script") or ""
+    raw_data = payload.get("raw_data") or _last.get("raw_data") or None
+    thumbnail_copy = payload.get("thumbnail_copy") or _last.get("thumbnail_copy") or ""
+    count = max(4, min(int(payload.get("count") or 8), 10))
+    if not script.strip() and not thumbnail_copy.strip():
+        raise ValueError("대본 또는 썸네일 문구가 없습니다. 먼저 대본을 생성하세요.")
+    _set_job(job_id, status="running", progress=25, department="design", message="디자인실 CTR 컨셉 회의중")
+    if not thumbnail_copy.strip():
+        result = mr.generate_thumbnail_copy(stock_name, script, raw_data=raw_data, output_dir=str(OUTPUT_DIR), save=True)
+        thumbnail_copy = result.get("text", "") if isinstance(result, dict) else str(result)
+    _set_job(job_id, progress=65, department="design", message="썸네일 후보 정리중")
+    extractor = getattr(mr, "_extract_thumbnail_image_candidates", None)
+    if callable(extractor):
+        raw_candidates = extractor(thumbnail_copy, limit=count)
+    else:
+        raw_candidates = []
+    profiles = list(getattr(mr, "THUMBNAIL_DESIGN_PROFILES", []) or [])
+    concepts = []
+    for idx in range(count):
+        candidate = raw_candidates[idx % len(raw_candidates)] if raw_candidates else {}
+        profile = profiles[idx % len(profiles)] if profiles else {"label": "프리미엄", "prompt": "premium high CTR Korean stock YouTube thumbnail"}
+        concepts.append({
+            "id": f"concept-{idx + 1}",
+            "selected": idx < min(4, count),
+            "candidate_no": idx + 1,
+            "badge": candidate.get("badge", "") if isinstance(candidate, dict) else "",
+            "main": candidate.get("main", "") if isinstance(candidate, dict) else "",
+            "sub": candidate.get("sub", "") if isinstance(candidate, dict) else "",
+            "style": profile.get("label", "") if isinstance(profile, dict) else str(profile),
+            "style_prompt": profile.get("prompt", "") if isinstance(profile, dict) else str(profile),
+            "ctr_score": max(70, 96 - idx * 3),
+        })
+    with _lock:
+        _last.update({"thumbnail_copy": thumbnail_copy, "thumbnail_concepts": concepts})
+    return {"thumbnail_copy": thumbnail_copy, "concepts": concepts}
+
+
 def _thumbnail_images(job_id: str, payload: Dict[str, Any]):
     stock_name = (payload.get("stock_name") or _last.get("stock_name") or "삼성전자").strip()
     copy = payload.get("thumbnail_copy") or _last.get("thumbnail_copy") or ""
     raw_data = payload.get("raw_data") or _last.get("raw_data") or None
     count = int(payload.get("count") or 3)
+    selected_concepts = payload.get("concepts") or []
     if not copy.strip():
         raise ValueError("썸네일 문구가 없습니다. 먼저 썸네일 문구를 생성하세요.")
     _set_job(job_id, status="running", progress=25, department="design", message="디자인실 이미지 시안 생성중")
+    if selected_concepts:
+        # 선택된 컨셉은 원본 썸네일 문구 앞에 붙여서 이미지 모델이 해당 문구를 우선 쓰게 한다.
+        concept_lines = []
+        for c in selected_concepts[:4]:
+            concept_lines.append(
+                f"[선택 컨셉] 배지: {c.get('badge','')} / 메인: {c.get('main','')} / 서브: {c.get('sub','')} / 스타일: {c.get('style','')}"
+            )
+        copy = "\n".join(concept_lines) + "\n\n" + copy
+        count = len(selected_concepts)
     result = mr.generate_thumbnail_images_ai(stock_name, copy, raw_data=raw_data, output_dir=str(OUTPUT_DIR), count=count, save=True)
+    for item in result.get("items", []):
+        item["url"] = _path_to_output_url(item.get("path"))
+    result["urls"] = [_path_to_output_url(p) for p in result.get("paths", [])]
+    with _lock:
+        _last.update({"thumbnail_images": result.get("items", [])})
     return result
 
 
@@ -228,6 +301,13 @@ def api_thumbnail_copy():
     return _json_ok(job_id=job_id)
 
 
+@app.route("/api/thumbnail-concepts", methods=["POST"])
+def api_thumbnail_concepts():
+    payload = request.get_json(force=True, silent=True) or {}
+    job_id = _start_job("thumbnail_concepts", "썸네일 컨셉 회의", _thumbnail_concepts, payload)
+    return _json_ok(job_id=job_id)
+
+
 @app.route("/api/thumbnail-images", methods=["POST"])
 def api_thumbnail_images():
     payload = request.get_json(force=True, silent=True) or {}
@@ -240,6 +320,23 @@ def api_last():
     with _lock:
         data = dict(_last)
     return _json_ok(last=data)
+
+
+@app.route("/api/output-file")
+def api_output_file():
+    raw = request.args.get("path", "")
+    if not raw:
+        return _json_error("파일 경로가 없습니다.", 400)
+    path = Path(raw).resolve()
+    try:
+        output_root = OUTPUT_DIR.resolve()
+        project_root = ROOT.resolve()
+        is_allowed = str(path).startswith(str(output_root)) or str(path).startswith(str(project_root))
+    except Exception:
+        is_allowed = False
+    if not is_allowed or not path.exists() or not path.is_file():
+        return _json_error("열 수 없는 파일입니다.", 404)
+    return send_file(path)
 
 
 @app.route("/api/open-output", methods=["POST"])
