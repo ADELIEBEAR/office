@@ -1,0 +1,10 @@
+﻿requests
+pykrx
+yfinance
+pandas
+lxml
+openai
+google-genai
+customtkinter
+pillow
+flask

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>주식 AI 제작사</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-card">
+        <div class="brand-kicker">AI PRODUCTION COMPANY</div>
+        <h1>주식 AI 제작사</h1>
+        <p>리서치팀, 작가팀, 디자인팀, 영상팀이 한 번에 움직입니다.</p>
+      </div>
+
+      <section class="control-card">
+        <div class="section-title">오늘 제작 의뢰</div>
+        <label>종목</label>
+        <select id="preset"></select>
+        <div class="two-grid">
+          <div><label>종목명</label><input id="stockName" value="삼성전자" /></div>
+          <div><label>코드/티커</label><input id="stockCode" value="005930" /></div>
+        </div>
+        <label>포맷</label>
+        <select id="formatName"></select>
+        <label>주제/메모</label>
+        <textarea id="customTopic" rows="3" placeholder="실적발표, 숨은정보형, 주말용처럼 꼭 넣을 내용만 적어주세요."></textarea>
+        <label>저장 폴더</label>
+        <input id="outputDir" />
+      </section>
+
+      <section class="control-card compact">
+        <div class="section-title">업무 버튼</div>
+        <div class="button-grid">
+          <button class="primary" id="collectBtn">① 리서치팀 자료 수집</button>
+          <button class="primary" id="scriptBtn">② 작가팀 90점 대본</button>
+          <button id="fastScriptBtn">⚡ 빠른 초안</button>
+          <button id="thumbCopyBtn">✍ 디자인팀 문구</button>
+          <button id="thumbImgBtn">🎨 이미지 시안</button>
+          <button id="openOutputBtn">📁 출고 폴더</button>
+        </div>
+      </section>
+
+      <section class="control-card compact">
+        <div class="section-title">다음 통합 예정</div>
+        <div class="tool-slot"><b>인포그래픽팀</b><span>슬라이드형 이미지 생성 연결 대기</span></div>
+        <div class="tool-slot"><b>영상팀</b><span>음성·자막·MP4 제작 연결 대기</span></div>
+        <div class="tool-slot"><b>GPT 썸네일팀</b><span>레퍼런스 기반 일괄 생성 연결 대기</span></div>
+      </section>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">COMPANY MAP</div>
+          <h2>내 AI 제작 회사 운영판</h2>
+        </div>
+        <div class="status-pill" id="globalStatus">대기중</div>
+      </header>
+
+      <section class="company-map" id="companyMap">
+        <svg class="flow-lines" viewBox="0 0 1000 520" preserveAspectRatio="none">
+          <path id="linePlanWrite" d="M230 145 C330 120, 380 120, 480 150" />
+          <path id="lineResearchWrite" d="M245 370 C330 340, 390 260, 480 190" />
+          <path id="lineWriteReview" d="M560 205 C590 260, 585 320, 560 370" />
+          <path id="lineReviewDesign" d="M620 370 C710 330, 760 240, 825 205" />
+          <path id="lineDesignShip" d="M850 235 C870 300, 865 365, 830 420" />
+          <path id="lineReviewShip" d="M620 405 C700 430, 740 440, 800 435" />
+        </svg>
+
+        <div class="office-room planning" data-dept="planning"><div class="worker">🧠</div><h3>기획실</h3><b>주제/각도 선정</b><p>무엇을 말할지 먼저 잡습니다.</p><span>대기</span></div>
+        <div class="office-room research" data-dept="research"><div class="worker">🔎</div><h3>리서치 본부</h3><b>뉴스·공시·수급</b><p>자료를 모으고 국면을 분리합니다.</p><span>대기</span></div>
+        <div class="office-room writing" data-dept="writing"><div class="worker">✍️</div><h3>작가팀</h3><b>구어체 대본</b><p>후킹과 흐름을 방송 말투로 씁니다.</p><span>대기</span></div>
+        <div class="office-room review" data-dept="review"><div class="worker">🛡️</div><h3>검수팀</h3><b>숫자·국면 체크</b><p>창작 수치와 튀는 표현을 걸러냅니다.</p><span>대기</span></div>
+        <div class="office-room design" data-dept="design"><div class="worker">🎨</div><h3>디자인실</h3><b>썸네일·인포그래픽</b><p>문구와 시각 자료를 만듭니다.</p><span>대기</span></div>
+        <div class="office-room video" data-dept="video"><div class="worker">🎬</div><h3>영상팀</h3><b>슬라이드·음성·MP4</b><p>다음 단계에서 붙일 제작 라인입니다.</p><span>대기</span></div>
+        <div class="office-room shipping" data-dept="shipping"><div class="worker">🚚</div><h3>출고 데스크</h3><b>저장·복사·폴더</b><p>결과물을 업로드 준비 상태로 넘깁니다.</p><span>대기</span></div>
+      </section>
+
+      <section class="job-panel">
+        <div class="job-head"><b id="jobTitle">작업 로그</b><span id="jobProgress">0%</span></div>
+        <div class="progress"><i id="progressBar"></i></div>
+        <div class="log" id="log"></div>
+      </section>
+
+      <section class="result-grid">
+        <article><h3>완성 대본</h3><textarea id="scriptOut" placeholder="대본이 여기에 표시됩니다."></textarea></article>
+        <article><h3>수집 데이터</h3><textarea id="rawOut" placeholder="수집 데이터가 여기에 표시됩니다."></textarea></article>
+        <article><h3>썸네일 / 디자인</h3><textarea id="thumbOut" placeholder="썸네일 문구와 이미지 결과가 여기에 표시됩니다."></textarea></article>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

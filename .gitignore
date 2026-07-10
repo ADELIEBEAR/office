@@ -1,0 +1,29 @@
+﻿# secrets / local config
+config.txt
+.env
+*.env
+openai_api_key.txt
+gemini_api_key.txt
+*_api_key.txt
+alert_state.json
+
+# generated data
+output/
+outputs/
+backup/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# bulky local files
+dart_corp_codes.xml
+*.zip
+vendor/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

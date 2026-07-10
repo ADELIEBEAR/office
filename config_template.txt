@@ -1,0 +1,36 @@
+﻿# ── 주식 자료조사기 설정 파일 ──────────────────
+# '=' 오른쪽에 값을 입력하고 저장하세요. 따옴표는 필요 없습니다.
+# 이 파일은 절대 공유하지 마세요.
+
+KRX_ID=
+KRX_PW=
+DART_API_KEY=
+
+# OpenAI API 키
+OPENAI_API_KEY=
+
+# Gemini API 키 (선택, 전체 대본생성 및 체인 보완용)
+GEMINI_API_KEY=
+
+# OpenAI 모델명
+OPENAI_TEXT_MODEL=gpt-5.5
+OPENAI_IMAGE_MODEL=gpt-image-1.5
+
+# Gemini 텍스트 모델명
+GEMINI_TEXT_MODEL=gemini-2.5-pro
+
+# 전체 대본생성 엔진: chain / openai / gemini / mixed
+BATCH_ENGINE_MODE=chain
+
+# 전체 대본생성 동시 작업 수. mixed는 2 권장
+BATCH_PARALLEL_WORKERS=2
+
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+WATCHLIST=TOP50
+CHECK_INTERVAL_MIN=30
+PRICE_ALERT_PCT=3.0
+DAILY_DIGEST_HOUR=18
+DAILY_DIGEST_MAX=10
+
+
