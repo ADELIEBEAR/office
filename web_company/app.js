@@ -6,12 +6,27 @@ const deptOrder = ["planning","research","writing","review","design","video","sh
 const activeLines = {
   research: ["lineResearchWrite"], writing: ["linePlanWrite","lineResearchWrite"], review: ["lineWriteReview"], design: ["lineReviewDesign"], video: ["lineReviewDesign"], shipping: ["lineDesignShip","lineReviewShip"]
 };
+const deptDefaultTalk = {
+  planning: "오늘 영상 방향 잡는 중",
+  research: "공시랑 수급 확인할게요",
+  writing: "말로 읽히게 다듬는 중",
+  review: "숫자랑 장중 표현 볼게요",
+  design: "클릭될 그림으로 바꾸는 중",
+  video: "일레븐랩스 음성 준비",
+  shipping: "한 폴더로 포장합니다"
+};
 function log(msg){ const el=$("log"); const t=new Date().toLocaleTimeString(); el.innerHTML = `<div>[${t}] ${escapeHtml(msg)}</div>` + el.innerHTML; }
 function escapeHtml(s){return String(s||"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));}
-function setDept(active, done=[]){
+function shortTask(msg, fallback){
+  const text=String(msg||fallback||'대기중').replace(/^[0-9]+\/[0-9]+\s*/,'');
+  return text.length>22 ? text.slice(0,22)+'…' : text;
+}
+function setDept(active, done=[], message=''){
   document.querySelectorAll('.office-room').forEach(room=>{
     const id=room.dataset.dept; room.classList.toggle('active', id===active); room.classList.toggle('done', done.includes(id));
     room.querySelector('span').textContent = id===active ? '작업중' : (done.includes(id) ? '완료' : '대기');
+    const bubble=room.querySelector('.bubble'); if(bubble) bubble.textContent = id===active ? shortTask(message, deptDefaultTalk[id]) : deptDefaultTalk[id];
+    const chip=room.querySelector('.task-chip'); if(chip) chip.textContent = id===active ? '지금 작업중' : (done.includes(id) ? '완료됨' : '대기중');
   });
   document.querySelectorAll('.flow-lines path').forEach(p=>p.classList.remove('active'));
   (activeLines[active]||[]).forEach(id=>{ const el=$(id); if(el) el.classList.add('active'); });
@@ -27,9 +42,9 @@ async function poll(){
   clearTimeout(pollTimer);
   try{
     const r=await fetch('/api/job/'+currentJob); const j=await r.json(); if(!j.ok) throw new Error(j.error||'작업 조회 실패');
-    const job=j.job; const pct=job.progress||0; $('jobProgress').textContent=pct+'%'; $('progressBar').style.width=pct+'%'; $('globalStatus').textContent=job.message||job.status; $('jobTitle').textContent=job.title+' · '+job.status; setDept(job.department||'planning', doneBefore(job.department));
+    const job=j.job; const pct=job.progress||0; $('jobProgress').textContent=pct+'%'; $('progressBar').style.width=pct+'%'; $('globalStatus').textContent=job.message||job.status; $('jobTitle').textContent=job.title+' · '+job.status; setDept(job.department||'planning', doneBefore(job.department), job.message||'');
     if(job.message) log(job.message);
-    if(job.status==='done') { handleResult(job); cleanupButtons(); setDept('shipping', deptOrder.filter(d=>d!=='video')); log('작업 완료'); return; }
+    if(job.status==='done') { handleResult(job); cleanupButtons(); setDept('shipping', deptOrder.filter(d=>d!=='video'), '출고 완료'); log('작업 완료'); return; }
     if(job.status==='error') { cleanupButtons(); setDept('review', []); log('오류: '+job.error); alert(job.error||'오류'); return; }
     pollTimer=setTimeout(poll,1200);
   } catch(e){ cleanupButtons(); log('조회 오류: '+e.message); alert(e.message); }

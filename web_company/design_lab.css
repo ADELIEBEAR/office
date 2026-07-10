@@ -284,6 +284,169 @@
   color: #bfdbfe;
 }
 
+/* 오피스 게임형 회사맵 연출 */
+.company-map {
+  isolation: isolate;
+}
+
+.company-map::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 22% 22%, rgba(96, 165, 250, .12), transparent 20%),
+    radial-gradient(circle at 76% 28%, rgba(34, 211, 238, .10), transparent 22%),
+    radial-gradient(circle at 55% 82%, rgba(52, 211, 153, .08), transparent 26%);
+  pointer-events: none;
+  animation: ambientGlow 7s ease-in-out infinite alternate;
+  z-index: 0;
+}
+
+.office-room {
+  overflow: visible;
+}
+
+.office-room::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(96, 165, 250, .28), transparent 35%, rgba(34, 211, 238, .16));
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+  transition: opacity .25s;
+}
+
+.office-room.active::before {
+  opacity: 1;
+  animation: activeRoomGlow 1.4s ease-in-out infinite alternate;
+}
+
+.office-room.done::after {
+  content: '완료 ✓';
+  position: absolute;
+  left: 14px;
+  bottom: -12px;
+  background: #052e16;
+  border: 1px solid #22c55e;
+  color: #bbf7d0;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 900;
+  box-shadow: 0 8px 22px rgba(34, 197, 94, .16);
+}
+
+.worker {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), 0 10px 22px rgba(0,0,0,.2);
+}
+
+.office-room.active .worker {
+  background: linear-gradient(135deg, #1d4ed8, #0891b2);
+  box-shadow: 0 0 28px rgba(96, 165, 250, .42);
+}
+
+.task-chip {
+  position: absolute;
+  left: 14px;
+  top: 61px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 130px;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, .86);
+  border: 1px solid #26354d;
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.office-room.active .task-chip {
+  color: #dbeafe;
+  border-color: rgba(96, 165, 250, .7);
+  background: rgba(37, 99, 235, .2);
+  animation: chipBlink 1s ease-in-out infinite alternate;
+}
+
+.bubble {
+  position: absolute;
+  left: 58px;
+  top: -34px;
+  max-width: 190px;
+  min-height: 28px;
+  padding: 7px 10px;
+  border-radius: 14px 14px 14px 4px;
+  background: rgba(226, 232, 240, .96);
+  color: #0f172a;
+  border: 1px solid rgba(255,255,255,.6);
+  box-shadow: 0 12px 30px rgba(0,0,0,.24);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.25;
+  opacity: 0;
+  transform: translateY(8px) scale(.96);
+  pointer-events: none;
+  transition: .22s opacity, .22s transform;
+}
+
+.office-room.active .bubble {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.office-room.done .bubble {
+  opacity: .74;
+  transform: translateY(0) scale(.95);
+}
+
+.flow-lines path.active {
+  stroke-dasharray: 6 12;
+}
+
+.status-pill {
+  position: relative;
+  overflow: hidden;
+}
+
+.status-pill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+  transform: translateX(-120%);
+  animation: statusSweep 2.2s linear infinite;
+}
+
+.log div:first-child {
+  color: #e0f2fe;
+  font-weight: 900;
+}
+
+@keyframes ambientGlow {
+  from { opacity: .65; transform: scale(1); }
+  to { opacity: 1; transform: scale(1.03); }
+}
+
+@keyframes activeRoomGlow {
+  from { filter: blur(0); opacity: .42; }
+  to { filter: blur(1px); opacity: .9; }
+}
+
+@keyframes chipBlink {
+  from { box-shadow: 0 0 0 rgba(96,165,250,0); }
+  to { box-shadow: 0 0 18px rgba(96,165,250,.32); }
+}
+
+@keyframes statusSweep {
+  to { transform: translateX(120%); }
+}
+
 @media (max-width: 1100px) {
   .workspace {
     grid-template-rows: auto 520px auto auto auto auto auto;
