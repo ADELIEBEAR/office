@@ -11,6 +11,7 @@ import threading
 import time
 import uuid
 import webbrowser
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
@@ -19,6 +20,7 @@ from urllib.parse import quote
 from flask import Flask, jsonify, request, send_file, send_from_directory
 
 import market_research as mr
+import infographic_engine as ie
 
 ROOT = Path(__file__).resolve().parent
 WEB_DIR = ROOT / "web_company"
@@ -67,6 +69,16 @@ def _json_ok(**kwargs):
 
 def _json_error(message: str, code: int = 400):
     return jsonify({"ok": False, "error": str(message)}), code
+
+
+def _as_bool(value, default=True) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() not in {"0", "false", "no", "off", ""}
 
 
 def _new_job(kind: str, title: str) -> str:
@@ -444,29 +456,25 @@ def _infographic_concepts(job_id: str, payload: Dict[str, Any]):
     stock_name = (payload.get("stock_name") or _last.get("stock_name") or "삼성전자").strip()
     script = payload.get("script") or _last.get("script") or ""
     count = max(3, min(int(payload.get("count") or 6), 8))
+    color_theme = payload.get("infographic_color_theme") or payload.get("color_theme") or "dark_lineart_city"
+    custom_color = payload.get("infographic_custom_color") or payload.get("custom_color") or ""
+    layout_concept = payload.get("infographic_layout_concept") or payload.get("layout_concept") or "photo_fullbleed"
+    photo_accent = _as_bool(payload.get("infographic_photo_accent"), True)
     if not script.strip():
         raise ValueError("완성 대본이 없습니다. 먼저 대본을 생성하세요.")
 
-    _set_job(job_id, status="running", progress=25, department="design", message="인포그래픽팀이 대본 장면을 나누는 중")
-    blocks = _script_blocks(script, limit=count)
-    if not blocks:
+    _set_job(job_id, status="running", progress=25, department="design", message="고급 인포그래픽 엔진이 대본 장면을 나누는 중")
+    concepts = ie.build_concepts(
+        stock_name=stock_name,
+        script=script,
+        count=count,
+        color_theme=color_theme,
+        custom_color=custom_color,
+        layout_concept=layout_concept,
+        photo_accent=photo_accent,
+    )
+    if not concepts:
         raise ValueError("인포그래픽으로 나눌 대본 문단을 찾지 못했습니다.")
-
-    concepts = []
-    for idx, block in enumerate(blocks[:count]):
-        style = INFOGRAPHIC_STYLES[idx % len(INFOGRAPHIC_STYLES)]
-        concepts.append({
-            "id": f"info-{idx + 1}",
-            "selected": idx < min(4, len(blocks)),
-            "scene_no": idx + 1,
-            "title": _infer_infographic_title(stock_name, block, idx),
-            "main": _compact_text(block, 46),
-            "support": _compact_text(block, 96),
-            "layout": style["layout"],
-            "style": style["label"],
-            "style_prompt": style["prompt"],
-            "source_text": block,
-        })
 
     with _lock:
         _last.update({"infographic_concepts": concepts})
@@ -474,31 +482,7 @@ def _infographic_concepts(job_id: str, payload: Dict[str, Any]):
 
 
 def _build_infographic_prompt(stock_name: str, concept: Dict[str, Any]) -> str:
-    return f"""
-Create ONE premium 16:9 Korean finance infographic slide.
-
-Subject: {stock_name}
-Style: {concept.get('style_prompt') or 'premium dark Korean finance infographic'}
-Layout: {concept.get('layout') or 'large title, main point card, three support cards'}
-
-Use ONLY these Korean text elements. Do not add extra claims or invented numbers.
-TITLE: {concept.get('title') or ''}
-MAIN: {concept.get('main') or ''}
-SUPPORT: {concept.get('support') or ''}
-
-Design rules:
-- Deep black or navy matte background, premium office dashboard mood.
-- Large readable Korean typography. Text must be sharp and high contrast.
-- Keep text short. Do not paste long script sentences.
-- Use 3 to 5 visual blocks maximum.
-- Add tasteful chart lines, arrows, cards, flow maps, or data widgets only as visual support.
-- No logos, no watermarks, no random English labels, no fake tickers, no extra numbers.
-- Calm professional finance tone. No disaster, war, blood, explosion, or game clutter.
-- Leave safe margins so YouTube crop does not cut text.
-
-Source scene for context only, not for direct copy:
-{_compact_text(concept.get('source_text') or '', 500)}
-""".strip()
+    return ie.build_prompt_from_concept(concept)
 
 
 def _generate_infographic_image(stock_name: str, concept: Dict[str, Any], output_dir: str):
@@ -550,16 +534,35 @@ def _infographic_slides(job_id: str, payload: Dict[str, Any]):
         raise ValueError("선택된 인포그래픽 후보가 없습니다. 먼저 인포 기획을 눌러주세요.")
 
     selected = selected[:4]
-    _set_job(job_id, status="running", progress=18, department="design", message="인포그래픽팀 이미지 시안 생성 시작")
+    workers = max(1, min(int(payload.get("image_parallel_workers") or 2), 4))
+    _set_job(job_id, status="running", progress=18, department="design", message=f"고급 인포그래픽 이미지 병렬 생성 시작 ({workers}개 작업)")
     items = []
-    for idx, concept in enumerate(selected):
-        pct = 18 + int((idx / max(1, len(selected))) * 68)
-        _set_job(job_id, progress=pct, department="design", message=f"인포그래픽 {idx + 1}/{len(selected)} 생성중")
-        items.append(_generate_infographic_image(stock_name, concept, output_dir))
+    errors = []
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(_generate_infographic_image, stock_name, concept, output_dir): (idx, concept)
+            for idx, concept in enumerate(selected)
+        }
+        done_count = 0
+        for future in as_completed(futures):
+            idx, concept = futures[future]
+            done_count += 1
+            pct = 18 + int((done_count / max(1, len(selected))) * 68)
+            try:
+                item = future.result()
+                item["concept"] = concept
+                items.append(item)
+                _set_job(job_id, progress=pct, department="design", message=f"인포그래픽 {done_count}/{len(selected)} 생성 완료")
+            except Exception as exc:  # noqa: BLE001 - 다른 이미지 생성은 계속 살린다
+                errors.append(f"{idx + 1}: {exc}")
+                _set_job(job_id, progress=pct, department="design", message=f"인포그래픽 {idx + 1} 실패, 나머지 진행")
 
     with _lock:
         _last.update({"infographic_slides": items})
-    return {"infographic_items": items}
+    result = {"infographic_items": items}
+    if errors:
+        result["errors"] = errors
+    return result
 
 
 def _one_click_package(job_id: str, payload: Dict[str, Any]):
@@ -815,6 +818,8 @@ def api_config():
         presets=PRESETS,
         formats=list(mr.SCRIPT_FORMATS.keys()),
         departments=DEPARTMENTS,
+        infographic_themes=ie.theme_options(),
+        infographic_layouts=ie.layout_options(),
         output_dir=str(OUTPUT_DIR),
         external_tools={
             "infographic_source": r"C:\Users\pc\Documents\Codex\2026-07-03\d\work\stock_editor_app.py",

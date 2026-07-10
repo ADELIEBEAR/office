@@ -17,7 +17,7 @@ function setDept(active, done=[]){
   (activeLines[active]||[]).forEach(id=>{ const el=$(id); if(el) el.classList.add('active'); });
 }
 function doneBefore(active){ const i=deptOrder.indexOf(active); return i>0 ? deptOrder.slice(0,i) : []; }
-function payload(engine){ return { stock_name: $('stockName').value.trim(), stock_code: $('stockCode').value.trim(), format_name: $('formatName').value, custom_topic: $('customTopic').value, output_dir: $('outputDir').value, engine: engine || 'chain', raw_data: lastData.raw_data, script: lastData.script, thumbnail_copy: lastData.thumbnail_copy, concepts: selectedConcepts(), infographic_concepts: selectedInfoConcepts() }; }
+function payload(engine){ return { stock_name: $('stockName').value.trim(), stock_code: $('stockCode').value.trim(), format_name: $('formatName').value, custom_topic: $('customTopic').value, output_dir: $('outputDir').value, engine: engine || 'chain', raw_data: lastData.raw_data, script: lastData.script, thumbnail_copy: lastData.thumbnail_copy, concepts: selectedConcepts(), infographic_concepts: selectedInfoConcepts(), infographic_color_theme: $('infoTheme')?.value || 'dark_lineart_city', infographic_layout_concept: $('infoLayout')?.value || 'photo_fullbleed', infographic_photo_accent: $('infoPhotoAccent')?.checked ?? true, infographic_custom_color: $('infoCustomColor')?.value || '', image_parallel_workers: Number($('infoWorkers')?.value || 2) }; }
 async function api(path, body){ const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); const j=await r.json(); if(!j.ok) throw new Error(j.error||'요청 실패'); return j; }
 async function startJob(path, body){
   const res=await api(path, body); currentJob=res.job_id; $('globalStatus').textContent='작업 시작'; $('jobTitle').textContent='작업 #' + currentJob; $('progressBar').style.width='3%'; log('제작 의뢰 접수: '+path); document.querySelectorAll('button').forEach(b=>b.classList.add('busy')); poll();
@@ -155,6 +155,8 @@ async function loadConfig(){
   const r=await fetch('/api/config'); const j=await r.json(); if(!j.ok) throw new Error(j.error||'설정 로드 실패');
   const preset=$('preset'); preset.innerHTML=''; Object.entries(j.presets).forEach(([name,code])=>{ const o=document.createElement('option'); o.value=name; o.textContent=name; o.dataset.code=code; preset.appendChild(o); });
   const fmt=$('formatName'); fmt.innerHTML=''; j.formats.forEach(f=>{ const o=document.createElement('option'); o.value=f; o.textContent=f; fmt.appendChild(o); });
+  const theme=$('infoTheme'); if(theme){ theme.innerHTML=''; (j.infographic_themes||[]).forEach(t=>{ const o=document.createElement('option'); o.value=t.key; o.textContent=t.label; theme.appendChild(o); }); theme.value='dark_lineart_city'; }
+  const layout=$('infoLayout'); if(layout){ layout.innerHTML=''; (j.infographic_layouts||[]).forEach(l=>{ const o=document.createElement('option'); o.value=l.key; o.textContent=l.label; layout.appendChild(o); }); layout.value='photo_fullbleed'; }
   $('outputDir').value=j.output_dir||'';
   preset.addEventListener('change',()=>{ const opt=preset.selectedOptions[0]; $('stockName').value=opt.value; $('stockCode').value=opt.dataset.code||''; });
   log('AI 제작사 로드 완료');

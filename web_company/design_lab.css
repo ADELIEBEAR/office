@@ -133,6 +133,21 @@
   white-space: nowrap;
 }
 
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.check-row input {
+  width: auto;
+  accent-color: #60a5fa;
+}
+
 .concept-strip {
   display: grid;
   grid-auto-flow: column;

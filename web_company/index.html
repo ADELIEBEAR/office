@@ -55,6 +55,24 @@
         <div class="tool-slot"><b>영상팀</b><span>음성·자막·MP4 제작 연결 대기</span></div>
         <div class="tool-slot"><b>GPT 썸네일팀</b><span>레퍼런스 기반 일괄 생성 연결 대기</span></div>
       </section>
+
+      <section class="control-card compact">
+        <div class="section-title">인포그래픽 고급 설정</div>
+        <label>색상 테마</label>
+        <select id="infoTheme"></select>
+        <label>레이아웃</label>
+        <select id="infoLayout"></select>
+        <label class="check-row"><input id="infoPhotoAccent" type="checkbox" checked /> 사진/3D 포인트 사용</label>
+        <label>사용자 지정 색상</label>
+        <textarea id="infoCustomColor" rows="2" placeholder="직접 색상 톤을 지정할 때만 입력하세요."></textarea>
+        <label>이미지 병렬 작업 수</label>
+        <select id="infoWorkers">
+          <option value="1">1개 안정</option>
+          <option value="2" selected>2개 권장</option>
+          <option value="3">3개 빠름</option>
+          <option value="4">4개 공격적</option>
+        </select>
+      </section>
     </aside>
 
     <main class="workspace">
