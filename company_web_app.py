@@ -10,7 +10,7 @@ import time
 import uuid
 import webbrowser
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 from urllib.parse import quote
 
 from flask import Flask, jsonify, request, send_file, send_from_directory
@@ -29,6 +29,8 @@ _last: Dict[str, Any] = {
     "thumbnail_copy": "",
     "thumbnail_concepts": [],
     "thumbnail_images": [],
+    "infographic_concepts": [],
+    "infographic_slides": [],
     "stock_name": "삼성전자",
     "stock_code": "005930",
 }
@@ -247,6 +249,196 @@ def _thumbnail_images(job_id: str, payload: Dict[str, Any]):
     return result
 
 
+INFOGRAPHIC_STYLES = [
+    {
+        "label": "프리미엄 다크 리포트",
+        "layout": "큰 제목 + 핵심 숫자 카드 + 3개 근거 카드",
+        "prompt": "deep black and navy premium Korean finance infographic, glass cards, subtle blue glow, clean keynote slide",
+    },
+    {
+        "label": "돈의 흐름 맵",
+        "layout": "좌우 자금 흐름 화살표 + 하단 체크포인트",
+        "prompt": "fund flow map, arrows, institutional money movement, dark professional dashboard, minimal but high contrast",
+    },
+    {
+        "label": "질문형 분석 보드",
+        "layout": "상단 질문 + 중앙 모순 구조 + 우측 결론 박스",
+        "prompt": "premium explainer board, question driven Korean business slide, clean hierarchy, dramatic but not noisy",
+    },
+    {
+        "label": "주말 큰그림 슬라이드",
+        "layout": "큰 그림 키워드 3개 + 다음 관전 포인트",
+        "prompt": "weekend big picture finance slide, calm editorial layout, warm dark gradient, clean Korean typography",
+    },
+    {
+        "label": "숨은정보 해부도",
+        "layout": "겉으로 보이는 숫자 vs 실제 봐야 할 정보",
+        "prompt": "hidden insight breakdown, layered cards, microscope style metaphor, premium stock analysis infographic",
+    },
+    {
+        "label": "타임라인 요약",
+        "layout": "왼쪽 시간 흐름 + 오른쪽 판단 기준",
+        "prompt": "timeline style finance infographic, restrained dark theme, crisp readable Korean text, chart accents",
+    },
+]
+
+
+def _compact_text(value: str, limit: int = 72) -> str:
+    text = " ".join(str(value or "").replace("\r", " ").replace("\n", " ").split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0] or text[:limit]
+    return cut.rstrip("., ") + "…"
+
+
+def _script_blocks(script: str, limit: int = 6) -> List[str]:
+    raw_blocks = []
+    for part in str(script or "").replace("\r\n", "\n").split("---<"):
+        cleaned = " ".join(line.strip() for line in part.splitlines() if line.strip())
+        if len(cleaned) >= 45:
+            raw_blocks.append(cleaned)
+    if not raw_blocks and script.strip():
+        sentences = [s.strip() for s in script.replace("\n", " ").split(".") if len(s.strip()) >= 30]
+        raw_blocks = sentences[:limit]
+    return raw_blocks[:limit]
+
+
+def _infer_infographic_title(stock_name: str, block: str, idx: int) -> str:
+    if idx == 0:
+        return f"{stock_name}, 겉보다 속을 봐야 합니다"
+    if "외국인" in block or "기관" in block or "개인" in block:
+        return "돈의 방향이 갈린 지점"
+    if "실적" in block or "영업이익" in block or "매출" in block:
+        return "실적 숫자 다음에 볼 것"
+    if "환율" in block or "반도체" in block or "글로벌" in block:
+        return "시장 배경까지 같이 봐야 합니다"
+    if "공매도" in block or "신용" in block:
+        return "수급 뒤에 숨어 있는 부담"
+    return f"핵심 장면 {idx + 1}"
+
+
+def _infographic_concepts(job_id: str, payload: Dict[str, Any]):
+    stock_name = (payload.get("stock_name") or _last.get("stock_name") or "삼성전자").strip()
+    script = payload.get("script") or _last.get("script") or ""
+    count = max(3, min(int(payload.get("count") or 6), 8))
+    if not script.strip():
+        raise ValueError("완성 대본이 없습니다. 먼저 대본을 생성하세요.")
+
+    _set_job(job_id, status="running", progress=25, department="design", message="인포그래픽팀이 대본 장면을 나누는 중")
+    blocks = _script_blocks(script, limit=count)
+    if not blocks:
+        raise ValueError("인포그래픽으로 나눌 대본 문단을 찾지 못했습니다.")
+
+    concepts = []
+    for idx, block in enumerate(blocks[:count]):
+        style = INFOGRAPHIC_STYLES[idx % len(INFOGRAPHIC_STYLES)]
+        concepts.append({
+            "id": f"info-{idx + 1}",
+            "selected": idx < min(4, len(blocks)),
+            "scene_no": idx + 1,
+            "title": _infer_infographic_title(stock_name, block, idx),
+            "main": _compact_text(block, 46),
+            "support": _compact_text(block, 96),
+            "layout": style["layout"],
+            "style": style["label"],
+            "style_prompt": style["prompt"],
+            "source_text": block,
+        })
+
+    with _lock:
+        _last.update({"infographic_concepts": concepts})
+    return {"infographic_concepts": concepts}
+
+
+def _build_infographic_prompt(stock_name: str, concept: Dict[str, Any]) -> str:
+    return f"""
+Create ONE premium 16:9 Korean finance infographic slide.
+
+Subject: {stock_name}
+Style: {concept.get('style_prompt') or 'premium dark Korean finance infographic'}
+Layout: {concept.get('layout') or 'large title, main point card, three support cards'}
+
+Use ONLY these Korean text elements. Do not add extra claims or invented numbers.
+TITLE: {concept.get('title') or ''}
+MAIN: {concept.get('main') or ''}
+SUPPORT: {concept.get('support') or ''}
+
+Design rules:
+- Deep black or navy matte background, premium office dashboard mood.
+- Large readable Korean typography. Text must be sharp and high contrast.
+- Keep text short. Do not paste long script sentences.
+- Use 3 to 5 visual blocks maximum.
+- Add tasteful chart lines, arrows, cards, flow maps, or data widgets only as visual support.
+- No logos, no watermarks, no random English labels, no fake tickers, no extra numbers.
+- Calm professional finance tone. No disaster, war, blood, explosion, or game clutter.
+- Leave safe margins so YouTube crop does not cut text.
+
+Source scene for context only, not for direct copy:
+{_compact_text(concept.get('source_text') or '', 500)}
+""".strip()
+
+
+def _generate_infographic_image(stock_name: str, concept: Dict[str, Any], output_dir: str):
+    client = mr._make_openai_client()
+    prompt = _build_infographic_prompt(stock_name, concept)
+    errors = []
+    candidates_fn = getattr(mr, "_openai_image_model_candidates", None)
+    candidates = candidates_fn(None) if callable(candidates_fn) else ["gpt-image-1.5", "gpt-image-1"]
+    for model_name in candidates:
+        try:
+            response = client.images.generate(
+                model=model_name,
+                prompt=prompt,
+                size="1536x1024",
+                n=1,
+            )
+            path = mr._save_openai_image_response(
+                response,
+                output_dir,
+                stock_name,
+                model_name,
+                suffix=f"인포그래픽_{concept.get('scene_no') or ''}_{concept.get('style') or ''}",
+            )
+            return {
+                "path": path,
+                "url": _path_to_output_url(path),
+                "model": model_name,
+                "prompt": prompt,
+                "title": concept.get("title", ""),
+                "main": concept.get("main", ""),
+                "style": concept.get("style", ""),
+                "scene_no": concept.get("scene_no"),
+            }
+        except Exception as exc:  # noqa: BLE001 - 모델 fallback용
+            errors.append(f"{model_name}: {exc}")
+            msg = str(exc).lower()
+            if "404" not in msg and "not_found" not in msg and "not found" not in msg:
+                break
+    raise RuntimeError("인포그래픽 이미지 생성 실패\n" + "\n".join(errors[-3:]))
+
+
+def _infographic_slides(job_id: str, payload: Dict[str, Any]):
+    stock_name = (payload.get("stock_name") or _last.get("stock_name") or "삼성전자").strip()
+    output_dir = payload.get("output_dir") or str(OUTPUT_DIR)
+    selected = payload.get("infographic_concepts") or []
+    if not selected:
+        selected = [c for c in (_last.get("infographic_concepts") or []) if c.get("selected")]
+    if not selected:
+        raise ValueError("선택된 인포그래픽 후보가 없습니다. 먼저 인포 기획을 눌러주세요.")
+
+    selected = selected[:4]
+    _set_job(job_id, status="running", progress=18, department="design", message="인포그래픽팀 이미지 시안 생성 시작")
+    items = []
+    for idx, concept in enumerate(selected):
+        pct = 18 + int((idx / max(1, len(selected))) * 68)
+        _set_job(job_id, progress=pct, department="design", message=f"인포그래픽 {idx + 1}/{len(selected)} 생성중")
+        items.append(_generate_infographic_image(stock_name, concept, output_dir))
+
+    with _lock:
+        _last.update({"infographic_slides": items})
+    return {"infographic_items": items}
+
+
 @app.route("/")
 def index():
     return send_from_directory(WEB_DIR, "index.html")
@@ -312,6 +504,20 @@ def api_thumbnail_concepts():
 def api_thumbnail_images():
     payload = request.get_json(force=True, silent=True) or {}
     job_id = _start_job("thumbnail_images", "썸네일 이미지", _thumbnail_images, payload)
+    return _json_ok(job_id=job_id)
+
+
+@app.route("/api/infographic-concepts", methods=["POST"])
+def api_infographic_concepts():
+    payload = request.get_json(force=True, silent=True) or {}
+    job_id = _start_job("infographic_concepts", "인포그래픽 기획", _infographic_concepts, payload)
+    return _json_ok(job_id=job_id)
+
+
+@app.route("/api/infographic-slides", methods=["POST"])
+def api_infographic_slides():
+    payload = request.get_json(force=True, silent=True) or {}
+    job_id = _start_job("infographic_slides", "인포그래픽 이미지", _infographic_slides, payload)
     return _json_ok(job_id=job_id)
 
 

@@ -1,7 +1,7 @@
 const $ = (id) => document.getElementById(id);
 let currentJob = null;
 let pollTimer = null;
-let lastData = { raw_data: "", script: "", thumbnail_copy: "", thumbnail_concepts: [], thumbnail_images: [] };
+let lastData = { raw_data: "", script: "", thumbnail_copy: "", thumbnail_concepts: [], thumbnail_images: [], infographic_concepts: [], infographic_slides: [] };
 const deptOrder = ["planning","research","writing","review","design","video","shipping"];
 const activeLines = {
   research: ["lineResearchWrite"], writing: ["linePlanWrite","lineResearchWrite"], review: ["lineWriteReview"], design: ["lineReviewDesign"], video: ["lineReviewDesign"], shipping: ["lineDesignShip","lineReviewShip"]
@@ -17,7 +17,7 @@ function setDept(active, done=[]){
   (activeLines[active]||[]).forEach(id=>{ const el=$(id); if(el) el.classList.add('active'); });
 }
 function doneBefore(active){ const i=deptOrder.indexOf(active); return i>0 ? deptOrder.slice(0,i) : []; }
-function payload(engine){ return { stock_name: $('stockName').value.trim(), stock_code: $('stockCode').value.trim(), format_name: $('formatName').value, custom_topic: $('customTopic').value, output_dir: $('outputDir').value, engine: engine || 'chain', raw_data: lastData.raw_data, script: lastData.script, thumbnail_copy: lastData.thumbnail_copy, concepts: selectedConcepts() }; }
+function payload(engine){ return { stock_name: $('stockName').value.trim(), stock_code: $('stockCode').value.trim(), format_name: $('formatName').value, custom_topic: $('customTopic').value, output_dir: $('outputDir').value, engine: engine || 'chain', raw_data: lastData.raw_data, script: lastData.script, thumbnail_copy: lastData.thumbnail_copy, concepts: selectedConcepts(), infographic_concepts: selectedInfoConcepts() }; }
 async function api(path, body){ const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); const j=await r.json(); if(!j.ok) throw new Error(j.error||'요청 실패'); return j; }
 async function startJob(path, body){
   const res=await api(path, body); currentJob=res.job_id; $('globalStatus').textContent='작업 시작'; $('jobTitle').textContent='작업 #' + currentJob; $('progressBar').style.width='3%'; log('제작 의뢰 접수: '+path); document.querySelectorAll('button').forEach(b=>b.classList.add('busy')); poll();
@@ -42,6 +42,8 @@ function handleResult(job){
   if(r.thumbnail_copy){ lastData.thumbnail_copy=r.thumbnail_copy; $('thumbOut').value=r.thumbnail_copy; }
   if(Array.isArray(r.concepts)){ lastData.thumbnail_concepts=r.concepts; renderConcepts(r.concepts); }
   if(Array.isArray(r.items)){ lastData.thumbnail_images=r.items; renderGallery(r.items); $('thumbOut').value = JSON.stringify(r,null,2); }
+  if(Array.isArray(r.infographic_concepts)){ lastData.infographic_concepts=r.infographic_concepts; renderInfoConcepts(r.infographic_concepts); $('thumbOut').value = JSON.stringify(r.infographic_concepts,null,2); }
+  if(Array.isArray(r.infographic_items)){ lastData.infographic_slides=r.infographic_items; renderInfoGallery(r.infographic_items); $('thumbOut').value = JSON.stringify(r,null,2); }
   if(Array.isArray(r.results)){ $('thumbOut').value = JSON.stringify(r,null,2); }
   if(r.path){ log('저장 파일: '+r.path); }
 }
@@ -84,6 +86,46 @@ function renderGallery(items){
     </div>`;
   }).join('');
 }
+
+function renderInfoConcepts(concepts){
+  const root=$('infoConceptStrip');
+  if(!root) return;
+  if(!concepts.length){ root.innerHTML='<div class="empty-card">인포그래픽 후보가 없습니다.</div>'; return; }
+  root.innerHTML=concepts.map((c,idx)=>`
+    <div class="concept-card ${c.selected?'selected':''}" data-idx="${idx}">
+      <span class="score">S${c.scene_no||idx+1}</span>
+      <b>${escapeHtml(c.style||'프리미엄 다크')}</b>
+      <strong>${escapeHtml(c.title||'슬라이드 제목')}</strong>
+      <em>${escapeHtml(c.main||'핵심 문장')}</em>
+      <span class="layout">${escapeHtml(c.layout||'카드형 레이아웃')}</span>
+      <small>대본 장면 ${idx+1}</small>
+    </div>
+  `).join('');
+  root.querySelectorAll('.concept-card').forEach(card=>{
+    card.onclick=()=>{
+      const idx=Number(card.dataset.idx);
+      lastData.infographic_concepts[idx].selected=!lastData.infographic_concepts[idx].selected;
+      renderInfoConcepts(lastData.infographic_concepts);
+    };
+  });
+}
+
+function selectedInfoConcepts(){
+  return (lastData.infographic_concepts||[]).filter(c=>c.selected);
+}
+
+function renderInfoGallery(items){
+  const root=$('infoGallery');
+  if(!root) return;
+  if(!items.length){ root.innerHTML='<div class="empty-card">인포그래픽 이미지 결과가 없습니다.</div>'; return; }
+  root.innerHTML=items.map((item,idx)=>{
+    const url=item.url||'';
+    return `<div class="thumb-card">
+      ${url?`<img src="${escapeHtml(url)}" alt="infographic ${idx+1}" />`:'<div class="empty-card">이미지 없음</div>'}
+      <a href="${escapeHtml(url)}" target="_blank">인포 ${idx+1} 열기 · ${escapeHtml(item.style||'')}</a>
+    </div>`;
+  }).join('');
+}
 async function loadConfig(){
   const r=await fetch('/api/config'); const j=await r.json(); if(!j.ok) throw new Error(j.error||'설정 로드 실패');
   const preset=$('preset'); preset.innerHTML=''; Object.entries(j.presets).forEach(([name,code])=>{ const o=document.createElement('option'); o.value=name; o.textContent=name; o.dataset.code=code; preset.appendChild(o); });
@@ -98,8 +140,12 @@ $('fastScriptBtn').onclick=()=>startJob('/api/script', payload('fast_openai'));
 $('thumbCopyBtn').onclick=()=>startJob('/api/thumbnail-copy', payload());
 $('thumbConceptBtn').onclick=()=>startJob('/api/thumbnail-concepts', {...payload(), count:8});
 $('thumbImgBtn').onclick=()=>startJob('/api/thumbnail-images', {...payload(), count:Math.max(1, selectedConcepts().length || 3)});
+$('infoConceptBtn').onclick=()=>startJob('/api/infographic-concepts', {...payload(), count:6});
+$('infoImgBtn').onclick=()=>startJob('/api/infographic-slides', {...payload(), count:Math.max(1, selectedInfoConcepts().length || 4)});
 $('openOutputBtn').onclick=()=>api('/api/open-output',{}).then(r=>log('폴더 열기: '+r.path)).catch(e=>alert(e.message));
 $('selectAllConcepts').onclick=()=>{ lastData.thumbnail_concepts=(lastData.thumbnail_concepts||[]).map(c=>({...c,selected:true})); renderConcepts(lastData.thumbnail_concepts); };
 $('clearConcepts').onclick=()=>{ lastData.thumbnail_concepts=(lastData.thumbnail_concepts||[]).map(c=>({...c,selected:false})); renderConcepts(lastData.thumbnail_concepts); };
+$('selectAllInfo').onclick=()=>{ lastData.infographic_concepts=(lastData.infographic_concepts||[]).map(c=>({...c,selected:true})); renderInfoConcepts(lastData.infographic_concepts); };
+$('clearInfo').onclick=()=>{ lastData.infographic_concepts=(lastData.infographic_concepts||[]).map(c=>({...c,selected:false})); renderInfoConcepts(lastData.infographic_concepts); };
 loadConfig().catch(e=>alert(e.message));
 setDept(null,[]);

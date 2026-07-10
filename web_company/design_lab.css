@@ -1,13 +1,14 @@
 /* 디자인실 고도화: CTR 컨셉 회의 + 썸네일 갤러리 */
 .workspace {
-  grid-template-rows: auto minmax(330px, 1fr) 116px 260px 220px;
+  grid-template-rows: auto minmax(300px, 1fr) 116px 250px 250px 220px;
 }
 
 .company-map {
   min-height: 330px;
 }
 
-.thumbnail-lab {
+.thumbnail-lab,
+.infographic-lab {
   background: rgba(17, 24, 39, .86);
   border: 1px solid rgba(148, 163, 184, .18);
   border-radius: 24px;
@@ -15,6 +16,12 @@
   overflow: hidden;
   box-shadow: 0 22px 70px rgba(0, 0, 0, .22);
   backdrop-filter: blur(14px);
+}
+
+.infographic-lab {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(34, 211, 238, .12), transparent 32%),
+    rgba(17, 24, 39, .86);
 }
 
 .lab-head {
@@ -68,6 +75,11 @@
   box-shadow: 0 0 24px rgba(96, 165, 250, .18);
 }
 
+.info-strip .concept-card.selected {
+  border-color: #22d3ee;
+  box-shadow: 0 0 24px rgba(34, 211, 238, .18);
+}
+
 .concept-card .score {
   position: absolute;
   right: 10px;
@@ -107,6 +119,14 @@
   display: block;
   margin-top: 10px;
   color: #94a3b8;
+}
+
+.concept-card .layout {
+  display: block;
+  margin-top: 8px;
+  color: #a7f3d0;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .gallery {
@@ -153,12 +173,22 @@
   text-align: center;
 }
 
+.tool-slot.online {
+  border-color: #1d4ed8;
+  background: linear-gradient(135deg, rgba(37, 99, 235, .18), #0f172a);
+}
+
+.tool-slot.online b {
+  color: #bfdbfe;
+}
+
 @media (max-width: 1100px) {
   .workspace {
-    grid-template-rows: auto 520px auto auto auto;
+    grid-template-rows: auto 520px auto auto auto auto;
   }
 
-  .thumbnail-lab {
+  .thumbnail-lab,
+  .infographic-lab {
     min-height: 260px;
   }
 }
