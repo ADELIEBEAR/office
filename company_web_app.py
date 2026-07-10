@@ -295,10 +295,10 @@ def _script_blocks(script: str, limit: int = 6) -> List[str]:
     raw_blocks = []
     for part in str(script or "").replace("\r\n", "\n").split("---<"):
         cleaned = " ".join(line.strip() for line in part.splitlines() if line.strip())
-        if len(cleaned) >= 45:
+        if len(cleaned) >= 12:
             raw_blocks.append(cleaned)
     if not raw_blocks and script.strip():
-        sentences = [s.strip() for s in script.replace("\n", " ").split(".") if len(s.strip()) >= 30]
+        sentences = [s.strip() for s in script.replace("\n", " ").split(".") if len(s.strip()) >= 12]
         raw_blocks = sentences[:limit]
     return raw_blocks[:limit]
 
@@ -439,6 +439,98 @@ def _infographic_slides(job_id: str, payload: Dict[str, Any]):
     return {"infographic_items": items}
 
 
+def _one_click_package(job_id: str, payload: Dict[str, Any]):
+    """영상팀 전 단계까지 한 번에 준비한다.
+
+    비용과 시간이 큰 실제 이미지 생성은 제외하고,
+    자료·대본·썸네일 문구·썸네일 컨셉·인포그래픽 기획까지만 자동 진행한다.
+    """
+    stock_name = (payload.get("stock_name") or "삼성전자").strip()
+    stock_code = (payload.get("stock_code") or "005930").strip().upper()
+    format_name = payload.get("format_name") or next(iter(mr.SCRIPT_FORMATS))
+    custom_topic = payload.get("custom_topic") or ""
+    engine = payload.get("engine") or "chain"
+    output_dir = payload.get("output_dir") or str(OUTPUT_DIR)
+
+    _set_job(job_id, status="running", progress=5, department="planning", message="원클릭 제작실 접수")
+
+    collect_payload = {
+        "stock_name": stock_name,
+        "stock_code": stock_code,
+        "format_name": format_name,
+        "custom_topic": custom_topic,
+    }
+    _set_job(job_id, progress=12, department="research", message="1/5 리서치팀 자료 수집")
+    collected = _collect(job_id, collect_payload)
+    raw_data = collected.get("raw_data", "")
+
+    script_payload = {
+        "stock_name": stock_name,
+        "stock_code": stock_code,
+        "format_name": format_name,
+        "custom_topic": custom_topic,
+        "engine": engine,
+        "output_dir": output_dir,
+        "raw_data": raw_data,
+    }
+    _set_job(job_id, progress=35, department="writing", message="2/5 작가팀 대본 작성")
+    scripted = _script(job_id, script_payload)
+    script = scripted.get("script", "")
+
+    thumb_payload = {
+        "stock_name": stock_name,
+        "script": script,
+        "raw_data": raw_data,
+    }
+    _set_job(job_id, progress=66, department="design", message="3/5 디자인팀 썸네일 문구 작성")
+    thumb_copy = _thumbnail_copy(job_id, thumb_payload)
+    thumbnail_copy = thumb_copy.get("thumbnail_copy", "")
+
+    concept_payload = {
+        "stock_name": stock_name,
+        "script": script,
+        "raw_data": raw_data,
+        "thumbnail_copy": thumbnail_copy,
+        "count": 8,
+    }
+    _set_job(job_id, progress=78, department="design", message="4/5 CTR 컨셉 후보 정리")
+    thumb_concepts = _thumbnail_concepts(job_id, concept_payload)
+
+    info_payload = {
+        "stock_name": stock_name,
+        "script": script,
+        "count": 6,
+    }
+    _set_job(job_id, progress=90, department="design", message="5/5 인포그래픽 장면 기획")
+    info_concepts = _infographic_concepts(job_id, info_payload)
+
+    summary = {
+        "stock_name": stock_name,
+        "stock_code": stock_code,
+        "format_name": format_name,
+        "script_chars": len(script),
+        "raw_chars": len(raw_data),
+        "thumbnail_concept_count": len(thumb_concepts.get("concepts", []) or []),
+        "infographic_concept_count": len(info_concepts.get("infographic_concepts", []) or []),
+        "script_path": scripted.get("path"),
+        "thumbnail_copy_path": thumb_copy.get("path"),
+        "next_steps": [
+            "썸네일 컨셉을 고른 뒤 이미지 시안을 누르세요.",
+            "인포그래픽 장면을 고른 뒤 인포 이미지를 누르세요.",
+            "출고 폴더에서 저장된 대본과 문구 파일을 확인하세요.",
+        ],
+    }
+    return {
+        "summary": summary,
+        "raw_data": raw_data,
+        "script": script,
+        "path": scripted.get("path"),
+        "thumbnail_copy": thumbnail_copy,
+        "concepts": thumb_concepts.get("concepts", []),
+        "infographic_concepts": info_concepts.get("infographic_concepts", []),
+    }
+
+
 @app.route("/")
 def index():
     return send_from_directory(WEB_DIR, "index.html")
@@ -483,6 +575,13 @@ def api_collect():
 def api_script():
     payload = request.get_json(force=True, silent=True) or {}
     job_id = _start_job("script", "대본 생성", _script, payload)
+    return _json_ok(job_id=job_id)
+
+
+@app.route("/api/one-click", methods=["POST"])
+def api_one_click():
+    payload = request.get_json(force=True, silent=True) or {}
+    job_id = _start_job("one_click", "원클릭 제작실", _one_click_package, payload)
     return _json_ok(job_id=job_id)
 
 

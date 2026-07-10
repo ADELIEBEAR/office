@@ -45,7 +45,27 @@ function handleResult(job){
   if(Array.isArray(r.infographic_concepts)){ lastData.infographic_concepts=r.infographic_concepts; renderInfoConcepts(r.infographic_concepts); $('thumbOut').value = JSON.stringify(r.infographic_concepts,null,2); }
   if(Array.isArray(r.infographic_items)){ lastData.infographic_slides=r.infographic_items; renderInfoGallery(r.infographic_items); $('thumbOut').value = JSON.stringify(r,null,2); }
   if(Array.isArray(r.results)){ $('thumbOut').value = JSON.stringify(r,null,2); }
+  if(r.summary){ renderPackageSummary(r.summary); }
   if(r.path){ log('저장 파일: '+r.path); }
+}
+
+function renderPackageSummary(summary){
+  const root=$('packageGrid');
+  if(!root) return;
+  const rawChars=Number(summary.raw_chars||0).toLocaleString();
+  const scriptChars=Number(summary.script_chars||0).toLocaleString();
+  const thumbCount=Number(summary.thumbnail_concept_count||0);
+  const infoCount=Number(summary.infographic_concept_count||0);
+  $('packageStatus').textContent = `${escapeHtml(summary.stock_name||'종목')} 준비 완료`;
+  root.innerHTML = `
+    <div class="package-card"><b>자료</b><strong>${rawChars}</strong><small>수집 데이터 글자</small></div>
+    <div class="package-card"><b>대본</b><strong>${scriptChars}</strong><small>완성 대본 글자</small></div>
+    <div class="package-card"><b>썸네일</b><strong>${thumbCount}개</strong><small>CTR 컨셉 후보</small></div>
+    <div class="package-card"><b>인포</b><strong>${infoCount}개</strong><small>슬라이드 장면 후보</small></div>
+  `;
+  if(Array.isArray(summary.next_steps)){
+    summary.next_steps.forEach(step=>log('다음 단계: '+step));
+  }
 }
 
 function renderConcepts(concepts){
@@ -135,6 +155,7 @@ async function loadConfig(){
   log('AI 제작사 로드 완료');
 }
 $('collectBtn').onclick=()=>startJob('/api/collect', payload());
+$('oneClickBtn').onclick=()=>startJob('/api/one-click', payload('chain'));
 $('scriptBtn').onclick=()=>startJob('/api/script', payload('chain'));
 $('fastScriptBtn').onclick=()=>startJob('/api/script', payload('fast_openai'));
 $('thumbCopyBtn').onclick=()=>startJob('/api/thumbnail-copy', payload());
