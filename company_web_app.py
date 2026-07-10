@@ -249,7 +249,13 @@ def _generate_voice_files(script: str, package_dir: Path, stock_name: str, job_i
 
     cfg = getattr(mr, "_cfg", {}) or {}
     api_key = cfg.get("ELEVENLABS_API_KEY") or cfg.get("ELEVEN_API_KEY") or os.environ.get("ELEVENLABS_API_KEY") or os.environ.get("ELEVEN_API_KEY")
-    voice_id = cfg.get("ELEVENLABS_VOICE_ID") or cfg.get("ELEVEN_VOICE_ID") or os.environ.get("ELEVENLABS_VOICE_ID") or os.environ.get("ELEVEN_VOICE_ID")
+    voice_id = (
+        cfg.get("ELEVENLABS_VOICE_ID")
+        or cfg.get("ELEVEN_VOICE_ID")
+        or os.environ.get("ELEVENLABS_VOICE_ID")
+        or os.environ.get("ELEVEN_VOICE_ID")
+        or "21m00Tcm4TlvDq8ikWAM"
+    )
     model_name = cfg.get("ELEVENLABS_MODEL") or os.environ.get("ELEVENLABS_MODEL") or "eleven_multilingual_v2"
     stability = float(cfg.get("ELEVENLABS_STABILITY") or os.environ.get("ELEVENLABS_STABILITY") or 0.42)
     similarity = float(cfg.get("ELEVENLABS_SIMILARITY") or os.environ.get("ELEVENLABS_SIMILARITY") or 0.82)
@@ -257,9 +263,6 @@ def _generate_voice_files(script: str, package_dir: Path, stock_name: str, job_i
 
     if not api_key:
         return {"items": [], "error": "config.txt에 ELEVENLABS_API_KEY를 입력하세요."}
-    if not voice_id:
-        return {"items": [], "error": "config.txt에 ELEVENLABS_VOICE_ID를 입력하세요."}
-
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     headers = {
         "xi-api-key": api_key,
