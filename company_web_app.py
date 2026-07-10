@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 import re
+import requests
 import threading
 import time
 import uuid
@@ -241,58 +242,58 @@ def _chunk_for_tts(text: str, limit: int = 3200) -> List[str]:
     return chunks or ([source] if source else [])
 
 
-def _tts_model_candidates() -> List[str]:
-    configured = (
-        getattr(mr, "_cfg", {}).get("OPENAI_TTS_MODEL")
-        or os.environ.get("OPENAI_TTS_MODEL")
-        or ""
-    )
-    out = []
-    for item in [configured.strip(), "gpt-4o-mini-tts", "tts-1"]:
-        if item and item not in out:
-            out.append(item)
-    return out
-
-
 def _generate_voice_files(script: str, package_dir: Path, stock_name: str, job_id: str):
     chunks = _chunk_for_tts(script)
     if not chunks:
         return {"items": [], "error": "음성으로 만들 대본이 없습니다."}
 
-    client = mr._make_openai_client()
-    voice = (
-        getattr(mr, "_cfg", {}).get("OPENAI_TTS_VOICE")
-        or os.environ.get("OPENAI_TTS_VOICE")
-        or "alloy"
-    )
-    model_errors = []
-    for model_name in _tts_model_candidates():
-        try:
-            items = []
-            for idx, chunk in enumerate(chunks, start=1):
-                _set_job(job_id, progress=min(94, 82 + idx), department="video", message=f"음성 파일 생성중 {idx}/{len(chunks)}")
-                response = client.audio.speech.create(
-                    model=model_name,
-                    voice=voice,
-                    input=chunk,
-                    response_format="mp3",
-                )
-                path = package_dir / f"03_음성_{idx:02d}_{_safe_part(stock_name, 16)}.mp3"
-                if hasattr(response, "write_to_file"):
-                    response.write_to_file(str(path))
-                else:
-                    data = getattr(response, "content", None)
-                    if data is None:
-                        data = bytes(response)
-                    path.write_bytes(data)
-                items.append({"path": str(path), "url": _path_to_output_url(str(path)), "model": model_name, "voice": voice, "chars": len(chunk)})
-            return {"items": items, "model": model_name, "voice": voice, "count": len(items)}
-        except Exception as exc:  # noqa: BLE001 - TTS 모델 fallback
-            model_errors.append(f"{model_name}: {exc}")
-            msg = str(exc).lower()
-            if "404" not in msg and "not_found" not in msg and "not found" not in msg:
-                break
-    return {"items": [], "error": "음성 생성 실패\n" + "\n".join(model_errors[-3:])}
+    cfg = getattr(mr, "_cfg", {}) or {}
+    api_key = cfg.get("ELEVENLABS_API_KEY") or cfg.get("ELEVEN_API_KEY") or os.environ.get("ELEVENLABS_API_KEY") or os.environ.get("ELEVEN_API_KEY")
+    voice_id = cfg.get("ELEVENLABS_VOICE_ID") or cfg.get("ELEVEN_VOICE_ID") or os.environ.get("ELEVENLABS_VOICE_ID") or os.environ.get("ELEVEN_VOICE_ID")
+    model_name = cfg.get("ELEVENLABS_MODEL") or os.environ.get("ELEVENLABS_MODEL") or "eleven_multilingual_v2"
+    stability = float(cfg.get("ELEVENLABS_STABILITY") or os.environ.get("ELEVENLABS_STABILITY") or 0.42)
+    similarity = float(cfg.get("ELEVENLABS_SIMILARITY") or os.environ.get("ELEVENLABS_SIMILARITY") or 0.82)
+    style = float(cfg.get("ELEVENLABS_STYLE") or os.environ.get("ELEVENLABS_STYLE") or 0.22)
+
+    if not api_key:
+        return {"items": [], "error": "config.txt에 ELEVENLABS_API_KEY를 입력하세요."}
+    if not voice_id:
+        return {"items": [], "error": "config.txt에 ELEVENLABS_VOICE_ID를 입력하세요."}
+
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    headers = {
+        "xi-api-key": api_key,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg",
+    }
+    items = []
+    for idx, chunk in enumerate(chunks, start=1):
+        _set_job(job_id, progress=min(94, 82 + idx), department="video", message=f"일레븐랩스 음성 생성중 {idx}/{len(chunks)}")
+        payload = {
+            "text": chunk,
+            "model_id": model_name,
+            "voice_settings": {
+                "stability": stability,
+                "similarity_boost": similarity,
+                "style": style,
+                "use_speaker_boost": True,
+            },
+        }
+        response = requests.post(url, headers=headers, json=payload, timeout=180)
+        if response.status_code >= 400:
+            detail = response.text[:800]
+            return {"items": items, "error": f"ElevenLabs 음성 생성 실패: HTTP {response.status_code}\n{detail}"}
+        path = package_dir / f"03_음성_{idx:02d}_{_safe_part(stock_name, 16)}.mp3"
+        path.write_bytes(response.content)
+        items.append({
+            "path": str(path),
+            "url": _path_to_output_url(str(path)),
+            "model": model_name,
+            "voice": voice_id,
+            "chars": len(chunk),
+            "provider": "elevenlabs",
+        })
+    return {"items": items, "model": model_name, "voice": voice_id, "provider": "elevenlabs", "count": len(items)}
     try:
         p = Path(path).resolve()
         return "/api/output-file?path=" + quote(str(p))
