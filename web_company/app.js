@@ -35,7 +35,7 @@ function doneBefore(active){ const i=deptOrder.indexOf(active); return i>0 ? dep
 function payload(engine){ return { stock_name: $('stockName').value.trim(), stock_code: $('stockCode').value.trim(), format_name: $('formatName').value, custom_topic: $('customTopic').value, output_dir: $('outputDir').value, engine: engine || 'chain', raw_data: lastData.raw_data, script: lastData.script, thumbnail_copy: lastData.thumbnail_copy, concepts: selectedConcepts(), infographic_concepts: selectedInfoConcepts(), infographic_color_theme: $('infoTheme')?.value || 'dark_lineart_city', infographic_layout_concept: $('infoLayout')?.value || 'photo_fullbleed', infographic_photo_accent: $('infoPhotoAccent')?.checked ?? true, infographic_custom_color: $('infoCustomColor')?.value || '', image_parallel_workers: Number($('infoWorkers')?.value || 2) }; }
 async function api(path, body){ const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); const j=await r.json(); if(!j.ok) throw new Error(j.error||'요청 실패'); return j; }
 async function startJob(path, body){
-  const res=await api(path, body); currentJob=res.job_id; $('globalStatus').textContent='작업 시작'; $('jobTitle').textContent='작업 #' + currentJob; $('progressBar').style.width='3%'; log('제작 의뢰 접수: '+path); document.querySelectorAll('button').forEach(b=>b.classList.add('busy')); poll();
+  const res=await api(path, body); currentJob=res.job_id; document.body.classList.add('is-running'); $('globalStatus').textContent='작업 시작'; $('jobTitle').textContent='작업 #' + currentJob; $('progressBar').style.width='3%'; log('제작 의뢰 접수: '+path); document.querySelectorAll('button').forEach(b=>b.classList.add('busy')); poll();
 }
 async function poll(){
   if(!currentJob) return;
@@ -49,7 +49,7 @@ async function poll(){
     pollTimer=setTimeout(poll,1200);
   } catch(e){ cleanupButtons(); log('조회 오류: '+e.message); alert(e.message); }
 }
-function cleanupButtons(){ document.querySelectorAll('button').forEach(b=>b.classList.remove('busy')); }
+function cleanupButtons(){ document.querySelectorAll('button').forEach(b=>b.classList.remove('busy')); document.body.classList.remove('is-running'); }
 function handleResult(job){
   const r=job.result||{};
   if(r.raw_data){ lastData.raw_data=r.raw_data; $('rawOut').value=r.raw_data; }
@@ -177,6 +177,7 @@ async function loadConfig(){
   log('AI 제작사 로드 완료');
 }
 $('collectBtn').onclick=()=>startJob('/api/collect', payload());
+$('autoPilotBtn').onclick=()=>startJob('/api/full-package', payload('chain'));
 $('fullPackageBtn').onclick=()=>startJob('/api/full-package', payload('chain'));
 $('oneClickBtn').onclick=()=>startJob('/api/one-click', payload('chain'));
 $('scriptBtn').onclick=()=>startJob('/api/script', payload('chain'));

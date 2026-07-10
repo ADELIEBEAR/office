@@ -284,6 +284,38 @@
   color: #bfdbfe;
 }
 
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.autopilot-btn {
+  position: relative;
+  min-width: 168px;
+  border: 1px solid rgba(96, 165, 250, .36);
+  background:
+    linear-gradient(135deg, #2563eb, #7c3aed 52%, #0891b2),
+    radial-gradient(circle at 20% 0%, rgba(255,255,255,.26), transparent 26%);
+  color: white;
+  box-shadow: 0 14px 34px rgba(59, 130, 246, .28);
+  overflow: hidden;
+}
+
+.autopilot-btn::before {
+  content: '';
+  position: absolute;
+  inset: -40% -20%;
+  background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,.28), transparent 65%);
+  transform: translateX(-80%);
+  animation: autoSweep 2.8s linear infinite;
+}
+
+.autopilot-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 18px 42px rgba(96, 165, 250, .34);
+}
+
 /* 오피스 게임형 회사맵 연출 */
 .company-map {
   isolation: isolate;
@@ -339,12 +371,77 @@
 }
 
 .worker {
+  position: absolute;
+  overflow: hidden;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), 0 10px 22px rgba(0,0,0,.2);
+  color: transparent;
+  font-size: 0;
 }
 
 .office-room.active .worker {
   background: linear-gradient(135deg, #1d4ed8, #0891b2);
   box-shadow: 0 0 28px rgba(96, 165, 250, .42);
+}
+
+.worker::before,
+.worker::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  image-rendering: pixelated;
+}
+
+.worker::before {
+  top: 6px;
+  width: 16px;
+  height: 14px;
+  border-radius: 4px 4px 3px 3px;
+  background: #ffd7a8;
+  box-shadow:
+    -5px 2px 0 #1f2937,
+    5px 2px 0 #1f2937,
+    -3px 6px 0 #111827,
+    3px 6px 0 #111827,
+    0 -3px 0 #111827;
+}
+
+.worker::after {
+  bottom: 5px;
+  width: 22px;
+  height: 15px;
+  border-radius: 5px 5px 3px 3px;
+  background: #60a5fa;
+  box-shadow:
+    -7px 5px 0 #1e3a8a,
+    7px 5px 0 #1e3a8a,
+    -5px 16px 0 #0f172a,
+    5px 16px 0 #0f172a;
+}
+
+.planning .worker::after { background: #a78bfa; box-shadow: -7px 5px 0 #5b21b6, 7px 5px 0 #5b21b6, -5px 16px 0 #0f172a, 5px 16px 0 #0f172a; }
+.research .worker::after { background: #22d3ee; box-shadow: -7px 5px 0 #0e7490, 7px 5px 0 #0e7490, -5px 16px 0 #0f172a, 5px 16px 0 #0f172a; }
+.writing .worker::after { background: #fbbf24; box-shadow: -7px 5px 0 #92400e, 7px 5px 0 #92400e, -5px 16px 0 #0f172a, 5px 16px 0 #0f172a; }
+.review .worker::after { background: #34d399; box-shadow: -7px 5px 0 #047857, 7px 5px 0 #047857, -5px 16px 0 #0f172a, 5px 16px 0 #0f172a; }
+.design .worker::after { background: #f472b6; box-shadow: -7px 5px 0 #be185d, 7px 5px 0 #be185d, -5px 16px 0 #0f172a, 5px 16px 0 #0f172a; }
+.video .worker::after { background: #fb7185; box-shadow: -7px 5px 0 #be123c, 7px 5px 0 #be123c, -5px 16px 0 #0f172a, 5px 16px 0 #0f172a; }
+.shipping .worker::after { background: #94a3b8; box-shadow: -7px 5px 0 #475569, 7px 5px 0 #475569, -5px 16px 0 #0f172a, 5px 16px 0 #0f172a; }
+
+.office-room.active .worker::before {
+  animation: pixelNod .55s steps(2) infinite alternate;
+}
+
+.office-room.active .worker::after {
+  animation: pixelWork .38s steps(2) infinite alternate;
+}
+
+.is-running .company-map::before {
+  animation: gridSlide 1.8s linear infinite;
+}
+
+.is-running .package-board {
+  border-color: rgba(96, 165, 250, .32);
+  box-shadow: 0 0 0 1px rgba(96,165,250,.08), 0 24px 80px rgba(37,99,235,.14);
 }
 
 .task-chip {
@@ -445,6 +542,25 @@
 
 @keyframes statusSweep {
   to { transform: translateX(120%); }
+}
+
+@keyframes autoSweep {
+  to { transform: translateX(80%); }
+}
+
+@keyframes pixelNod {
+  from { transform: translateX(-50%) translateY(0); }
+  to { transform: translateX(-50%) translateY(2px); }
+}
+
+@keyframes pixelWork {
+  from { transform: translateX(-50%) translateY(0) skewX(-2deg); }
+  to { transform: translateX(-50%) translateY(-1px) skewX(2deg); }
+}
+
+@keyframes gridSlide {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 42px 42px, 42px 42px; }
 }
 
 @media (max-width: 1100px) {
