@@ -378,6 +378,40 @@
   font-size: 0;
 }
 
+.worker i {
+  position: absolute;
+  bottom: 9px;
+  width: 10px;
+  height: 12px;
+  border-radius: 3px 3px 2px 2px;
+  background: #60a5fa;
+  box-shadow: -3px 4px 0 #1e3a8a, 3px 4px 0 #1e3a8a;
+  opacity: .86;
+  image-rendering: pixelated;
+}
+
+.worker i::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: -8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px 3px 2px 2px;
+  background: #ffd7a8;
+  box-shadow: 0 -2px 0 #111827, -2px 2px 0 #1f2937, 2px 2px 0 #1f2937;
+}
+
+.worker i:nth-child(1) {
+  left: 5px;
+  transform: scale(.82);
+}
+
+.worker i:nth-child(2) {
+  right: 5px;
+  transform: scale(.82);
+}
+
 .office-room.active .worker {
   background: linear-gradient(135deg, #1d4ed8, #0891b2);
   box-shadow: 0 0 28px rgba(96, 165, 250, .42);
@@ -426,6 +460,13 @@
 .design .worker::after { background: #f472b6; box-shadow: -7px 5px 0 #be185d, 7px 5px 0 #be185d, -5px 16px 0 #0f172a, 5px 16px 0 #0f172a; }
 .video .worker::after { background: #fb7185; box-shadow: -7px 5px 0 #be123c, 7px 5px 0 #be123c, -5px 16px 0 #0f172a, 5px 16px 0 #0f172a; }
 .shipping .worker::after { background: #94a3b8; box-shadow: -7px 5px 0 #475569, 7px 5px 0 #475569, -5px 16px 0 #0f172a, 5px 16px 0 #0f172a; }
+.planning .worker i { background: #c4b5fd; box-shadow: -3px 4px 0 #5b21b6, 3px 4px 0 #5b21b6; }
+.research .worker i { background: #67e8f9; box-shadow: -3px 4px 0 #0e7490, 3px 4px 0 #0e7490; }
+.writing .worker i { background: #fde68a; box-shadow: -3px 4px 0 #92400e, 3px 4px 0 #92400e; }
+.review .worker i { background: #6ee7b7; box-shadow: -3px 4px 0 #047857, 3px 4px 0 #047857; }
+.design .worker i { background: #f9a8d4; box-shadow: -3px 4px 0 #be185d, 3px 4px 0 #be185d; }
+.video .worker i { background: #fda4af; box-shadow: -3px 4px 0 #be123c, 3px 4px 0 #be123c; }
+.shipping .worker i { background: #cbd5e1; box-shadow: -3px 4px 0 #475569, 3px 4px 0 #475569; }
 
 .office-room.active .worker::before {
   animation: pixelNod .55s steps(2) infinite alternate;
@@ -433,6 +474,14 @@
 
 .office-room.active .worker::after {
   animation: pixelWork .38s steps(2) infinite alternate;
+}
+
+.office-room.active .worker i:nth-child(1) {
+  animation: miniWorker .44s steps(2) infinite alternate;
+}
+
+.office-room.active .worker i:nth-child(2) {
+  animation: miniWorker .44s steps(2) .16s infinite alternate;
 }
 
 .is-running .company-map::before {
@@ -556,6 +605,11 @@
 @keyframes pixelWork {
   from { transform: translateX(-50%) translateY(0) skewX(-2deg); }
   to { transform: translateX(-50%) translateY(-1px) skewX(2deg); }
+}
+
+@keyframes miniWorker {
+  from { translate: 0 0; }
+  to { translate: 0 -2px; }
 }
 
 @keyframes gridSlide {

@@ -21,15 +21,26 @@ function shortTask(msg, fallback){
   const text=String(msg||fallback||'대기중').replace(/^[0-9]+\/[0-9]+\s*/,'');
   return text.length>22 ? text.slice(0,22)+'…' : text;
 }
+function normalizeActiveDepartments(active, message=''){
+  const list = Array.isArray(active) ? active.filter(Boolean) : [active].filter(Boolean);
+  const text = String(message || '');
+  if(/병렬|동시|음성|일레븐|영상팀/.test(text) && !list.includes('video')) list.push('video');
+  if(/병렬|동시|썸네일|인포|디자인실/.test(text) && !list.includes('design')) list.push('design');
+  return list.length ? list : [];
+}
 function setDept(active, done=[], message=''){
+  const activeList = normalizeActiveDepartments(active, message);
   document.querySelectorAll('.office-room').forEach(room=>{
-    const id=room.dataset.dept; room.classList.toggle('active', id===active); room.classList.toggle('done', done.includes(id));
-    room.querySelector('span').textContent = id===active ? '작업중' : (done.includes(id) ? '완료' : '대기');
-    const bubble=room.querySelector('.bubble'); if(bubble) bubble.textContent = id===active ? shortTask(message, deptDefaultTalk[id]) : deptDefaultTalk[id];
-    const chip=room.querySelector('.task-chip'); if(chip) chip.textContent = id===active ? '지금 작업중' : (done.includes(id) ? '완료됨' : '대기중');
+    const id=room.dataset.dept;
+    const isActive = activeList.includes(id);
+    room.classList.toggle('active', isActive);
+    room.classList.toggle('done', done.includes(id) && !isActive);
+    room.querySelector('span').textContent = isActive ? '작업중' : (done.includes(id) ? '완료' : '대기');
+    const bubble=room.querySelector('.bubble'); if(bubble) bubble.textContent = isActive ? shortTask(message, deptDefaultTalk[id]) : deptDefaultTalk[id];
+    const chip=room.querySelector('.task-chip'); if(chip) chip.textContent = isActive ? '팀 작업중' : (done.includes(id) ? '완료됨' : '대기중');
   });
   document.querySelectorAll('.flow-lines path').forEach(p=>p.classList.remove('active'));
-  (activeLines[active]||[]).forEach(id=>{ const el=$(id); if(el) el.classList.add('active'); });
+  activeList.forEach(dept => (activeLines[dept]||[]).forEach(id=>{ const el=$(id); if(el) el.classList.add('active'); }));
 }
 function doneBefore(active){ const i=deptOrder.indexOf(active); return i>0 ? deptOrder.slice(0,i) : []; }
 function payload(engine){ return { stock_name: $('stockName').value.trim(), stock_code: $('stockCode').value.trim(), format_name: $('formatName').value, custom_topic: $('customTopic').value, output_dir: $('outputDir').value, engine: engine || 'chain', raw_data: lastData.raw_data, script: lastData.script, thumbnail_copy: lastData.thumbnail_copy, concepts: selectedConcepts(), infographic_concepts: selectedInfoConcepts(), infographic_color_theme: $('infoTheme')?.value || 'dark_lineart_city', infographic_layout_concept: $('infoLayout')?.value || 'photo_fullbleed', infographic_photo_accent: $('infoPhotoAccent')?.checked ?? true, infographic_custom_color: $('infoCustomColor')?.value || '', image_parallel_workers: Number($('infoWorkers')?.value || 2) }; }

@@ -710,25 +710,43 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
     if thumbnail_copy and not Path(thumb_copy_path).exists():
         thumb_copy_path = _write_text_file(package_dir / "02_썸네일문구.txt", thumbnail_copy)
 
-    _set_job(job_id, progress=65, department="design", message="4/6 썸네일 이미지 생성")
-    thumbnail_result = {"items": [], "error": None}
-    try:
-        image_payload = {
-            "stock_name": stock_name,
-            "thumbnail_copy": thumbnail_copy,
-            "raw_data": raw_data,
-            "output_dir": str(package_dir),
-            "count": 1,
-        }
-        thumbnail_result = _thumbnail_images(job_id, image_payload)
-    except Exception as exc:  # noqa: BLE001 - 대본/음성 출고는 계속 진행
-        thumbnail_result = {"items": [], "error": str(exc)}
-        _write_text_file(package_dir / "썸네일_생성실패.txt", str(exc))
+    _set_job(job_id, progress=65, department="design", message="4/6 디자인실·영상팀 병렬 출고 시작")
 
-    _set_job(job_id, progress=80, department="video", message="5/6 음성 생성")
-    voice_result = _generate_voice_files(script, package_dir, stock_name, job_id)
-    if voice_result.get("error"):
-        _write_text_file(package_dir / "음성_생성실패.txt", voice_result.get("error", ""))
+    def run_thumbnail_image() -> Dict[str, Any]:
+        try:
+            image_payload = {
+                "stock_name": stock_name,
+                "thumbnail_copy": thumbnail_copy,
+                "raw_data": raw_data,
+                "output_dir": str(package_dir),
+                "count": 1,
+            }
+            return _thumbnail_images(job_id, image_payload)
+        except Exception as exc:  # noqa: BLE001 - 대본/음성 출고는 계속 진행
+            _write_text_file(package_dir / "썸네일_생성실패.txt", str(exc))
+            return {"items": [], "error": str(exc)}
+
+    def run_voice_export() -> Dict[str, Any]:
+        result = _generate_voice_files(script, package_dir, stock_name, job_id)
+        if result.get("error"):
+            _write_text_file(package_dir / "음성_생성실패.txt", result.get("error", ""))
+        return result
+
+    thumbnail_result = {"items": [], "error": None}
+    voice_result = {"items": [], "error": None}
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = {
+            executor.submit(run_thumbnail_image): "thumbnail",
+            executor.submit(run_voice_export): "voice",
+        }
+        for future in as_completed(futures):
+            label = futures[future]
+            if label == "thumbnail":
+                thumbnail_result = future.result()
+                _set_job(job_id, progress=78, department="design", message="썸네일 이미지 출고 완료 · 음성팀 병렬 진행")
+            else:
+                voice_result = future.result()
+                _set_job(job_id, progress=84, department="video", message="음성 파일 출고 완료 · 디자인실 병렬 진행")
 
     _set_job(job_id, progress=96, department="shipping", message="6/6 출고 목록 정리")
     manifest = {
