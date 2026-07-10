@@ -1,7 +1,7 @@
 const $ = (id) => document.getElementById(id);
 let currentJob = null;
 let pollTimer = null;
-let lastData = { raw_data: "", script: "", thumbnail_copy: "", thumbnail_concepts: [], thumbnail_images: [], infographic_concepts: [], infographic_slides: [] };
+let lastData = { raw_data: "", script: "", thumbnail_copy: "", thumbnail_concepts: [], thumbnail_images: [], infographic_concepts: [], infographic_slides: [], voice_items: [], full_package: {} };
 const deptOrder = ["planning","research","writing","review","design","video","shipping"];
 const activeLines = {
   research: ["lineResearchWrite"], writing: ["linePlanWrite","lineResearchWrite"], review: ["lineWriteReview"], design: ["lineReviewDesign"], video: ["lineReviewDesign"], shipping: ["lineDesignShip","lineReviewShip"]
@@ -44,6 +44,8 @@ function handleResult(job){
   if(Array.isArray(r.items)){ lastData.thumbnail_images=r.items; renderGallery(r.items); $('thumbOut').value = JSON.stringify(r,null,2); }
   if(Array.isArray(r.infographic_concepts)){ lastData.infographic_concepts=r.infographic_concepts; renderInfoConcepts(r.infographic_concepts); $('thumbOut').value = JSON.stringify(r.infographic_concepts,null,2); }
   if(Array.isArray(r.infographic_items)){ lastData.infographic_slides=r.infographic_items; renderInfoGallery(r.infographic_items); $('thumbOut').value = JSON.stringify(r,null,2); }
+  if(Array.isArray(r.voice_items)){ lastData.voice_items=r.voice_items; }
+  if(r.package){ lastData.full_package=r.package; }
   if(Array.isArray(r.results)){ $('thumbOut').value = JSON.stringify(r,null,2); }
   if(r.summary){ renderPackageSummary(r.summary); }
   if(r.path){ log('저장 파일: '+r.path); }
@@ -54,15 +56,18 @@ function renderPackageSummary(summary){
   if(!root) return;
   const rawChars=Number(summary.raw_chars||0).toLocaleString();
   const scriptChars=Number(summary.script_chars||0).toLocaleString();
-  const thumbCount=Number(summary.thumbnail_concept_count||0);
-  const infoCount=Number(summary.infographic_concept_count||0);
+  const thumbCount=Number(summary.thumbnail_image_count ?? summary.thumbnail_concept_count ?? 0);
+  const voiceCount=Number(summary.voice_count ?? summary.infographic_concept_count ?? 0);
+  const thumbLabel = summary.thumbnail_image_count !== undefined ? '썸네일 이미지' : 'CTR 컨셉 후보';
+  const voiceLabel = summary.voice_count !== undefined ? 'mp3 음성 파일' : '인포 장면 후보';
   $('packageStatus').textContent = `${escapeHtml(summary.stock_name||'종목')} 준비 완료`;
   root.innerHTML = `
     <div class="package-card"><b>자료</b><strong>${rawChars}</strong><small>수집 데이터 글자</small></div>
     <div class="package-card"><b>대본</b><strong>${scriptChars}</strong><small>완성 대본 글자</small></div>
-    <div class="package-card"><b>썸네일</b><strong>${thumbCount}개</strong><small>CTR 컨셉 후보</small></div>
-    <div class="package-card"><b>인포</b><strong>${infoCount}개</strong><small>슬라이드 장면 후보</small></div>
+    <div class="package-card"><b>썸네일</b><strong>${thumbCount}개</strong><small>${thumbLabel}</small></div>
+    <div class="package-card"><b>음성/인포</b><strong>${voiceCount}개</strong><small>${voiceLabel}</small></div>
   `;
+  $('packageFolder').textContent = summary.package_dir ? `출고 폴더: ${summary.package_dir}` : '';
   if(Array.isArray(summary.next_steps)){
     summary.next_steps.forEach(step=>log('다음 단계: '+step));
   }
@@ -155,6 +160,7 @@ async function loadConfig(){
   log('AI 제작사 로드 완료');
 }
 $('collectBtn').onclick=()=>startJob('/api/collect', payload());
+$('fullPackageBtn').onclick=()=>startJob('/api/full-package', payload('chain'));
 $('oneClickBtn').onclick=()=>startJob('/api/one-click', payload('chain'));
 $('scriptBtn').onclick=()=>startJob('/api/script', payload('chain'));
 $('fastScriptBtn').onclick=()=>startJob('/api/script', payload('fast_openai'));

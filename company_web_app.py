@@ -5,10 +5,12 @@
 from __future__ import annotations
 
 import os
+import re
 import threading
 import time
 import uuid
 import webbrowser
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 from urllib.parse import quote
@@ -31,6 +33,7 @@ _last: Dict[str, Any] = {
     "thumbnail_images": [],
     "infographic_concepts": [],
     "infographic_slides": [],
+    "full_package": {},
     "stock_name": "삼성전자",
     "stock_code": "005930",
 }
@@ -163,10 +166,11 @@ def _thumbnail_copy(job_id: str, payload: Dict[str, Any]):
     stock_name = (payload.get("stock_name") or _last.get("stock_name") or "삼성전자").strip()
     script = payload.get("script") or _last.get("script") or ""
     raw_data = payload.get("raw_data") or _last.get("raw_data") or None
+    output_dir = payload.get("output_dir") or str(OUTPUT_DIR)
     if not script.strip():
         raise ValueError("완성 대본이 없습니다. 먼저 대본을 생성하세요.")
     _set_job(job_id, status="running", progress=35, department="design", message="디자인실 썸네일 문구 기획중")
-    result = mr.generate_thumbnail_copy(stock_name, script, raw_data=raw_data, output_dir=str(OUTPUT_DIR), save=True)
+    result = mr.generate_thumbnail_copy(stock_name, script, raw_data=raw_data, output_dir=output_dir, save=True)
     text = result.get("text", "") if isinstance(result, dict) else str(result)
     with _lock:
         _last.update({"thumbnail_copy": text})
@@ -176,6 +180,119 @@ def _thumbnail_copy(job_id: str, payload: Dict[str, Any]):
 def _path_to_output_url(path: str | None) -> str | None:
     if not path:
         return None
+
+
+def _safe_part(value: str, limit: int = 42) -> str:
+    text = str(value or "").strip()
+    text = re.sub(r"[\\/:*?\"<>|]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip(" ._-")
+    if not text:
+        return "무제"
+    return text[:limit].strip()
+
+
+def _make_package_dir(stock_name: str, custom_topic: str, format_name: str, base_dir: str | None = None) -> Path:
+    now = datetime.now()
+    topic = custom_topic.strip() or format_name.strip() or "영상준비"
+    folder_name = f"{now.strftime('%Y-%m-%d_%H%M')}_{_safe_part(stock_name, 18)}_{_safe_part(topic, 34)}"
+    root = Path(base_dir or OUTPUT_DIR).resolve()
+    path = root / folder_name
+    if not path.exists():
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    for idx in range(2, 100):
+        candidate = root / f"{folder_name}_{idx:02d}"
+        if not candidate.exists():
+            candidate.mkdir(parents=True, exist_ok=True)
+            return candidate
+    raise RuntimeError("출고 폴더를 만들지 못했습니다.")
+
+
+def _write_text_file(path: Path, text: str):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(text or ""), encoding="utf-8")
+    return str(path)
+
+
+def _chunk_for_tts(text: str, limit: int = 3200) -> List[str]:
+    source = str(text or "").replace("\r\n", "\n").strip()
+    if hasattr(mr, "make_ai_voice_readable"):
+        source = mr.make_ai_voice_readable(source)
+    paragraphs = [p.strip() for p in re.split(r"\n+|---<", source) if p.strip()]
+    chunks: List[str] = []
+    current = ""
+    for paragraph in paragraphs:
+        if len(paragraph) > limit:
+            sentences = re.split(r"(?<=[.!?。！？요다죠니다까])\s+", paragraph)
+        else:
+            sentences = [paragraph]
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            if len(current) + len(sentence) + 2 <= limit:
+                current = (current + "\n\n" + sentence).strip()
+            else:
+                if current:
+                    chunks.append(current)
+                current = sentence
+    if current:
+        chunks.append(current)
+    return chunks or ([source] if source else [])
+
+
+def _tts_model_candidates() -> List[str]:
+    configured = (
+        getattr(mr, "_cfg", {}).get("OPENAI_TTS_MODEL")
+        or os.environ.get("OPENAI_TTS_MODEL")
+        or ""
+    )
+    out = []
+    for item in [configured.strip(), "gpt-4o-mini-tts", "tts-1"]:
+        if item and item not in out:
+            out.append(item)
+    return out
+
+
+def _generate_voice_files(script: str, package_dir: Path, stock_name: str, job_id: str):
+    chunks = _chunk_for_tts(script)
+    if not chunks:
+        return {"items": [], "error": "음성으로 만들 대본이 없습니다."}
+
+    client = mr._make_openai_client()
+    voice = (
+        getattr(mr, "_cfg", {}).get("OPENAI_TTS_VOICE")
+        or os.environ.get("OPENAI_TTS_VOICE")
+        or "alloy"
+    )
+    model_errors = []
+    for model_name in _tts_model_candidates():
+        try:
+            items = []
+            for idx, chunk in enumerate(chunks, start=1):
+                _set_job(job_id, progress=min(94, 82 + idx), department="video", message=f"음성 파일 생성중 {idx}/{len(chunks)}")
+                response = client.audio.speech.create(
+                    model=model_name,
+                    voice=voice,
+                    input=chunk,
+                    response_format="mp3",
+                )
+                path = package_dir / f"03_음성_{idx:02d}_{_safe_part(stock_name, 16)}.mp3"
+                if hasattr(response, "write_to_file"):
+                    response.write_to_file(str(path))
+                else:
+                    data = getattr(response, "content", None)
+                    if data is None:
+                        data = bytes(response)
+                    path.write_bytes(data)
+                items.append({"path": str(path), "url": _path_to_output_url(str(path)), "model": model_name, "voice": voice, "chars": len(chunk)})
+            return {"items": items, "model": model_name, "voice": voice, "count": len(items)}
+        except Exception as exc:  # noqa: BLE001 - TTS 모델 fallback
+            model_errors.append(f"{model_name}: {exc}")
+            msg = str(exc).lower()
+            if "404" not in msg and "not_found" not in msg and "not found" not in msg:
+                break
+    return {"items": [], "error": "음성 생성 실패\n" + "\n".join(model_errors[-3:])}
     try:
         p = Path(path).resolve()
         return "/api/output-file?path=" + quote(str(p))
@@ -188,12 +305,13 @@ def _thumbnail_concepts(job_id: str, payload: Dict[str, Any]):
     script = payload.get("script") or _last.get("script") or ""
     raw_data = payload.get("raw_data") or _last.get("raw_data") or None
     thumbnail_copy = payload.get("thumbnail_copy") or _last.get("thumbnail_copy") or ""
+    output_dir = payload.get("output_dir") or str(OUTPUT_DIR)
     count = max(4, min(int(payload.get("count") or 8), 10))
     if not script.strip() and not thumbnail_copy.strip():
         raise ValueError("대본 또는 썸네일 문구가 없습니다. 먼저 대본을 생성하세요.")
     _set_job(job_id, status="running", progress=25, department="design", message="디자인실 CTR 컨셉 회의중")
     if not thumbnail_copy.strip():
-        result = mr.generate_thumbnail_copy(stock_name, script, raw_data=raw_data, output_dir=str(OUTPUT_DIR), save=True)
+        result = mr.generate_thumbnail_copy(stock_name, script, raw_data=raw_data, output_dir=output_dir, save=True)
         thumbnail_copy = result.get("text", "") if isinstance(result, dict) else str(result)
     _set_job(job_id, progress=65, department="design", message="썸네일 후보 정리중")
     extractor = getattr(mr, "_extract_thumbnail_image_candidates", None)
@@ -226,6 +344,7 @@ def _thumbnail_images(job_id: str, payload: Dict[str, Any]):
     stock_name = (payload.get("stock_name") or _last.get("stock_name") or "삼성전자").strip()
     copy = payload.get("thumbnail_copy") or _last.get("thumbnail_copy") or ""
     raw_data = payload.get("raw_data") or _last.get("raw_data") or None
+    output_dir = payload.get("output_dir") or str(OUTPUT_DIR)
     count = int(payload.get("count") or 3)
     selected_concepts = payload.get("concepts") or []
     if not copy.strip():
@@ -240,7 +359,7 @@ def _thumbnail_images(job_id: str, payload: Dict[str, Any]):
             )
         copy = "\n".join(concept_lines) + "\n\n" + copy
         count = len(selected_concepts)
-    result = mr.generate_thumbnail_images_ai(stock_name, copy, raw_data=raw_data, output_dir=str(OUTPUT_DIR), count=count, save=True)
+    result = mr.generate_thumbnail_images_ai(stock_name, copy, raw_data=raw_data, output_dir=output_dir, count=count, save=True)
     for item in result.get("items", []):
         item["url"] = _path_to_output_url(item.get("path"))
     result["urls"] = [_path_to_output_url(p) for p in result.get("paths", [])]
@@ -531,6 +650,151 @@ def _one_click_package(job_id: str, payload: Dict[str, Any]):
     }
 
 
+def _full_package(job_id: str, payload: Dict[str, Any]):
+    """대본·썸네일 이미지·음성을 한 폴더에 모으는 완성 출고 패키지."""
+    stock_name = (payload.get("stock_name") or "삼성전자").strip()
+    stock_code = (payload.get("stock_code") or "005930").strip().upper()
+    format_name = payload.get("format_name") or next(iter(mr.SCRIPT_FORMATS))
+    custom_topic = payload.get("custom_topic") or ""
+    engine = payload.get("engine") or "chain"
+    base_output_dir = payload.get("output_dir") or str(OUTPUT_DIR)
+
+    package_dir = _make_package_dir(stock_name, custom_topic, format_name, base_output_dir)
+    _set_job(job_id, status="running", progress=4, department="planning", message=f"출고 폴더 생성: {package_dir.name}")
+
+    collect_payload = {
+        "stock_name": stock_name,
+        "stock_code": stock_code,
+        "format_name": format_name,
+        "custom_topic": custom_topic,
+    }
+    _set_job(job_id, progress=10, department="research", message="1/6 자료 수집")
+    collected = _collect(job_id, collect_payload)
+    raw_data = collected.get("raw_data", "")
+    raw_path = _write_text_file(package_dir / "00_수집데이터.txt", raw_data)
+
+    script_payload = {
+        "stock_name": stock_name,
+        "stock_code": stock_code,
+        "format_name": format_name,
+        "custom_topic": custom_topic,
+        "engine": engine,
+        "output_dir": str(package_dir),
+        "raw_data": raw_data,
+    }
+    _set_job(job_id, progress=28, department="writing", message="2/6 대본 생성")
+    scripted = _script(job_id, script_payload)
+    script = scripted.get("script", "")
+    script_path = scripted.get("path") or _write_text_file(package_dir / "01_완성대본.txt", script)
+    if script and not Path(script_path).exists():
+        script_path = _write_text_file(package_dir / "01_완성대본.txt", script)
+
+    thumb_payload = {
+        "stock_name": stock_name,
+        "script": script,
+        "raw_data": raw_data,
+        "output_dir": str(package_dir),
+    }
+    _set_job(job_id, progress=55, department="design", message="3/6 썸네일 문구 생성")
+    thumb_copy = _thumbnail_copy(job_id, thumb_payload)
+    thumbnail_copy = thumb_copy.get("thumbnail_copy", "")
+    thumb_copy_path = thumb_copy.get("path") or _write_text_file(package_dir / "02_썸네일문구.txt", thumbnail_copy)
+    if thumbnail_copy and not Path(thumb_copy_path).exists():
+        thumb_copy_path = _write_text_file(package_dir / "02_썸네일문구.txt", thumbnail_copy)
+
+    _set_job(job_id, progress=65, department="design", message="4/6 썸네일 이미지 생성")
+    thumbnail_result = {"items": [], "error": None}
+    try:
+        image_payload = {
+            "stock_name": stock_name,
+            "thumbnail_copy": thumbnail_copy,
+            "raw_data": raw_data,
+            "output_dir": str(package_dir),
+            "count": 1,
+        }
+        thumbnail_result = _thumbnail_images(job_id, image_payload)
+    except Exception as exc:  # noqa: BLE001 - 대본/음성 출고는 계속 진행
+        thumbnail_result = {"items": [], "error": str(exc)}
+        _write_text_file(package_dir / "썸네일_생성실패.txt", str(exc))
+
+    _set_job(job_id, progress=80, department="video", message="5/6 음성 생성")
+    voice_result = _generate_voice_files(script, package_dir, stock_name, job_id)
+    if voice_result.get("error"):
+        _write_text_file(package_dir / "음성_생성실패.txt", voice_result.get("error", ""))
+
+    _set_job(job_id, progress=96, department="shipping", message="6/6 출고 목록 정리")
+    manifest = {
+        "stock_name": stock_name,
+        "stock_code": stock_code,
+        "format_name": format_name,
+        "custom_topic": custom_topic,
+        "package_dir": str(package_dir),
+        "raw_path": raw_path,
+        "script_path": script_path,
+        "thumbnail_copy_path": thumb_copy_path,
+        "thumbnail_items": thumbnail_result.get("items", []),
+        "thumbnail_error": thumbnail_result.get("error"),
+        "voice_items": voice_result.get("items", []),
+        "voice_error": voice_result.get("error"),
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    _write_text_file(
+        package_dir / "출고목록.txt",
+        "\n".join([
+            f"종목: {stock_name} ({stock_code})",
+            f"포맷: {format_name}",
+            f"주제: {custom_topic or '-'}",
+            f"폴더: {package_dir}",
+            f"대본: {script_path}",
+            f"썸네일 문구: {thumb_copy_path}",
+            f"썸네일 이미지: {len(thumbnail_result.get('items', []) or [])}개",
+            f"음성: {len(voice_result.get('items', []) or [])}개",
+            f"썸네일 오류: {thumbnail_result.get('error') or '-'}",
+            f"음성 오류: {voice_result.get('error') or '-'}",
+        ]),
+    )
+
+    with _lock:
+        _last.update({
+            "raw_data": raw_data,
+            "script": script,
+            "thumbnail_copy": thumbnail_copy,
+            "thumbnail_images": thumbnail_result.get("items", []),
+            "full_package": manifest,
+            "stock_name": stock_name,
+            "stock_code": stock_code,
+        })
+
+    summary = {
+        "stock_name": stock_name,
+        "stock_code": stock_code,
+        "format_name": format_name,
+        "raw_chars": len(raw_data),
+        "script_chars": len(script),
+        "thumbnail_concept_count": 0,
+        "infographic_concept_count": 0,
+        "thumbnail_image_count": len(thumbnail_result.get("items", []) or []),
+        "voice_count": len(voice_result.get("items", []) or []),
+        "package_dir": str(package_dir),
+        "script_path": script_path,
+        "thumbnail_copy_path": thumb_copy_path,
+        "next_steps": [
+            "출고 폴더에서 대본, 썸네일 이미지, 음성 파일을 확인하세요.",
+            "썸네일이나 음성이 실패했다면 실패 메모 파일을 확인하세요.",
+        ],
+    }
+    return {
+        "summary": summary,
+        "raw_data": raw_data,
+        "script": script,
+        "path": script_path,
+        "thumbnail_copy": thumbnail_copy,
+        "items": thumbnail_result.get("items", []),
+        "voice_items": voice_result.get("items", []),
+        "package": manifest,
+    }
+
+
 @app.route("/")
 def index():
     return send_from_directory(WEB_DIR, "index.html")
@@ -582,6 +846,13 @@ def api_script():
 def api_one_click():
     payload = request.get_json(force=True, silent=True) or {}
     job_id = _start_job("one_click", "원클릭 제작실", _one_click_package, payload)
+    return _json_ok(job_id=job_id)
+
+
+@app.route("/api/full-package", methods=["POST"])
+def api_full_package():
+    payload = request.get_json(force=True, silent=True) or {}
+    job_id = _start_job("full_package", "완성 출고 패키지", _full_package, payload)
     return _json_ok(job_id=job_id)
 
 
