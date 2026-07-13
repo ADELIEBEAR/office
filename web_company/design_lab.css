@@ -1719,3 +1719,154 @@ button.primary,.autopilot-btn {
   .company-map{grid-template-columns:1fr;background-size:auto 100%}
   .pixel-agent{width:82px;height:106px}
 }
+
+/* Floor-aligned edition: 누끼 캐릭터를 실제 가구 위치에 올리는 오피스 맵 */
+.company-map {
+  display:block;
+  min-height:0;
+  height:clamp(570px,67vw,720px);
+  max-height:720px;
+  padding:58px 0 0;
+  background:
+    linear-gradient(rgba(255,247,231,.06),rgba(255,247,231,.1)),
+    url('assets/office_floor.png') center center/cover no-repeat;
+}
+.company-map::before {
+  inset:53px 0 0;
+  background:linear-gradient(180deg,rgba(255,250,240,.02),rgba(84,52,25,.07));
+}
+.company-map .flow-lines { display:none; }
+
+.company-map .office-room {
+  position:absolute;
+  z-index:5;
+  width:19%;
+  min-width:145px;
+  min-height:150px;
+  height:150px;
+  padding:0;
+  border:1px dashed rgba(102,75,48,.18);
+  border-radius:16px;
+  background:rgba(255,252,244,.08);
+  box-shadow:none;
+  backdrop-filter:none;
+  overflow:visible;
+}
+.company-map .office-room:hover {
+  border-color:rgba(185,102,66,.48);
+  background:rgba(255,250,238,.25);
+  box-shadow:0 8px 22px rgba(82,51,25,.12);
+}
+.company-map .office-room.active {
+  border:2px solid color-mix(in srgb,var(--uniform) 68%,#fff);
+  background:rgba(255,250,238,.36);
+  box-shadow:0 0 0 5px color-mix(in srgb,var(--uniform) 18%,transparent),0 12px 28px rgba(75,46,22,.18);
+}
+.company-map .office-room.done { border-color:rgba(89,133,90,.55); }
+
+.company-map .planning { left:48%; top:15%; width:18%; }
+.company-map .research { left:2%; top:49%; width:16%; }
+.company-map .writing { left:21%; top:51%; width:16%; }
+.company-map .review { left:40%; top:50%; width:16%; }
+.company-map .design { left:58%; top:48%; width:16%; }
+.company-map .video { left:70%; top:70%; width:16%; }
+.company-map .shipping { left:auto; right:2%; top:32%; width:14%; }
+
+.company-map .room-head {
+  position:absolute;
+  z-index:15;
+  left:50%;
+  top:-10px;
+  width:max-content;
+  max-width:100%;
+  transform:translateX(-50%);
+  border:1px solid rgba(132,94,58,.42);
+  border-radius:999px;
+  padding:5px 42px 5px 12px;
+  background:rgba(255,252,245,.93);
+  box-shadow:0 4px 12px rgba(84,52,25,.14);
+}
+.company-map .room-head .worker,
+.company-map .room-head b { display:none; }
+.company-map .room-head h3 {
+  margin:0;
+  color:#344057;
+  font-size:11px;
+  line-height:1;
+  white-space:nowrap;
+}
+.company-map .room-head > span {
+  right:4px;
+  top:3px;
+  padding:3px 6px;
+  border:0;
+  box-shadow:none;
+  font-size:7px;
+}
+.company-map .office-room > p,
+.company-map .office-room > .crew-list { display:none; }
+.company-map .office-room > .task-chip {
+  left:50%;
+  right:auto;
+  bottom:-8px;
+  z-index:16;
+  transform:translateX(-50%);
+  padding:3px 8px;
+  font-size:7px;
+  white-space:nowrap;
+  opacity:0;
+}
+.company-map .office-room.active > .task-chip,
+.company-map .office-room.done > .task-chip { opacity:1; }
+.company-map .office-room > .bubble {
+  top:auto;
+  bottom:105%;
+  z-index:20;
+  max-width:180px;
+  font-size:9px;
+}
+
+.company-map .tycoon-scene {
+  position:absolute;
+  inset:16px 0 0;
+  height:128px;
+}
+.office-room .pixel-agent {
+  width:78px;
+  height:104px;
+  border-radius:0;
+  background-color:transparent;
+  background-image:url('assets/ai_crew_actions_cutout.png');
+  mix-blend-mode:normal;
+  filter:drop-shadow(0 7px 4px rgba(70,44,24,.22));
+}
+.office-room .pixel-agent > b {
+  display:none;
+}
+.office-room .agent-1 { left:4%; top:5px; }
+.office-room .agent-2 { left:auto; right:3%; top:3px; }
+.office-room .agent-3 { display:none; }
+.company-map .shipping .agent-2,
+.company-map .video .agent-2 { display:none; }
+
+.office-mail-runner {
+  background-image:url('assets/ai_crew_actions_cutout.png');
+  mix-blend-mode:normal;
+}
+
+@media(max-width:1250px){
+  .company-map{height:620px;background-size:auto 100%}
+  .company-map .office-room{width:20%;min-width:130px;transform:scale(.9);transform-origin:center}
+  .company-map .pixel-agent{width:78px;height:104px}
+}
+@media(max-width:900px){
+  .company-map{height:760px;background-size:auto 100%}
+  .company-map .office-room{width:28%;transform:scale(.82)}
+  .company-map .planning{left:43%;top:13%}
+  .company-map .research{left:1%;top:43%}
+  .company-map .writing{left:25%;top:44%}
+  .company-map .review{left:49%;top:43%}
+  .company-map .design{left:69%;top:44%}
+  .company-map .video{left:62%;top:70%}
+  .company-map .shipping{right:1%;top:27%}
+}
