@@ -248,10 +248,21 @@ def _script(job_id: str, payload: Dict[str, Any]):
         engine=engine,
     )
     text = result.get("text", "")
+    stats = result.get("stats") or {}
     with _lock:
         _last.update({"raw_data": raw_data, "script": text, "stock_name": stock_name, "stock_code": stock_code})
-    _set_job(job_id, progress=88, department="review", message="검수팀 최종 확인중")
-    return {"stock_name": stock_name, "stock_code": stock_code, "script": text, "path": result.get("path"), "chars": len(text)}
+    review_message = "검수팀 최종 확인중"
+    if custom_topic and stats.get("topic_covered") is True:
+        review_message = "검수팀 핵심 주제 반영까지 확인중"
+    _set_job(job_id, progress=88, department="review", message=review_message)
+    return {
+        "stock_name": stock_name,
+        "stock_code": stock_code,
+        "script": text,
+        "path": result.get("path"),
+        "chars": len(text),
+        "stats": stats,
+    }
 
 
 def _thumbnail_copy(job_id: str, payload: Dict[str, Any]):
@@ -682,6 +693,7 @@ def _one_click_package(job_id: str, payload: Dict[str, Any]):
     _set_job(job_id, progress=35, department="writing", message="2/5 작가팀 대본 작성")
     scripted = _script(job_id, script_payload)
     script = scripted.get("script", "")
+    script_stats = scripted.get("stats") or {}
 
     thumb_payload = {
         "stock_name": stock_name,
@@ -715,6 +727,7 @@ def _one_click_package(job_id: str, payload: Dict[str, Any]):
         "stock_code": stock_code,
         "format_name": format_name,
         "script_chars": len(script),
+        "topic_covered": script_stats.get("topic_covered"),
         "raw_chars": len(raw_data),
         "thumbnail_concept_count": len(thumb_concepts.get("concepts", []) or []),
         "infographic_concept_count": len(info_concepts.get("infographic_concepts", []) or []),
@@ -730,6 +743,7 @@ def _one_click_package(job_id: str, payload: Dict[str, Any]):
         "summary": summary,
         "raw_data": raw_data,
         "script": script,
+        "stats": script_stats,
         "path": scripted.get("path"),
         "thumbnail_copy": thumbnail_copy,
         "concepts": thumb_concepts.get("concepts", []),
@@ -772,6 +786,7 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
     _set_job(job_id, progress=28, department="writing", message="2/6 대본 생성")
     scripted = _script(job_id, script_payload)
     script = scripted.get("script", "")
+    script_stats = scripted.get("stats") or {}
     script_path = scripted.get("path") or _write_text_file(package_dir / "01_완성대본.txt", script)
     if script and not Path(script_path).exists():
         script_path = _write_text_file(package_dir / "01_완성대본.txt", script)
@@ -865,6 +880,7 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
         "thumbnail_error": thumbnail_result.get("error"),
         "voice_items": voice_result.get("items", []),
         "voice_error": voice_result.get("error"),
+        "topic_covered": script_stats.get("topic_covered"),
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
     _write_text_file(
@@ -900,6 +916,7 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
         "format_name": format_name,
         "raw_chars": len(raw_data),
         "script_chars": len(script),
+        "topic_covered": script_stats.get("topic_covered"),
         "thumbnail_concept_count": 0,
         "infographic_concept_count": 0,
         "thumbnail_image_count": len(thumbnail_result.get("items", []) or []),
@@ -916,6 +933,7 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
         "summary": summary,
         "raw_data": raw_data,
         "script": script,
+        "stats": script_stats,
         "path": script_path,
         "thumbnail_copy": thumbnail_copy,
         "items": thumbnail_result.get("items", []),

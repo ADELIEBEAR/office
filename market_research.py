@@ -3385,6 +3385,44 @@ def _clean_user_topic_memo(topic):
     return s[:2000].strip()
 
 
+def _topic_focus_keywords(topic, limit=10):
+    """사용자 주제에서 최종 대본 반영 여부를 확인할 핵심어만 뽑는다."""
+    cleaned = _clean_user_topic_memo(topic)
+    if not cleaned:
+        return []
+    stopwords = {
+        "이번", "영상", "대본", "주제", "중심으로", "위주로", "설명해줘", "설명해주세요",
+        "써줘", "써주세요", "넣어줘", "넣어주세요", "해줘", "해주세요", "관련해서",
+        "이야기", "부분", "내용", "그리고", "하지만", "보다", "그냥", "정리", "쉽게",
+        "중요한지", "중요한", "투자자", "사람들", "중심", "강조", "분석",
+    }
+    found = []
+    for token in re.findall(r"[가-힣A-Za-z][가-힣A-Za-z0-9]{1,}", cleaned):
+        word = token.strip()
+        for suffix in ("에서도", "으로", "보다", "까지", "부터", "에서", "에게", "처럼", "하고", "이며", "으로", "에는", "과는", "와는", "을", "를", "이", "가", "은", "는", "과", "와", "의", "로"):
+            if len(word) >= len(suffix) + 2 and word.endswith(suffix):
+                word = word[:-len(suffix)]
+                break
+        if word in stopwords or word.endswith(("해줘", "해주세요", "말해줘", "말해주세요")):
+            continue
+        if word not in found:
+            found.append(word)
+        if len(found) >= max(1, int(limit)):
+            break
+    return found
+
+
+def _topic_focus_covered(script_text, topic):
+    """짧은 주제는 1개, 일반 주제는 핵심어 2개 이상 회수했는지 본다."""
+    keywords = _topic_focus_keywords(topic)
+    if not keywords:
+        return True, []
+    haystack = re.sub(r"\s+", "", str(script_text or "")).lower()
+    matched = [word for word in keywords if re.sub(r"\s+", "", word).lower() in haystack]
+    required = 1 if len(keywords) <= 2 else 2
+    return len(matched) >= required, matched
+
+
 def _topic_context_rules(topic_memo):
     """사용자 메모 속 날짜/주말 의도를 규칙으로 바꾼다. 최종 대본 문장은 만들지 않는다."""
     s = str(topic_memo or "")
@@ -3528,11 +3566,27 @@ def _build_compact_script_prompt(stock_name, raw_data, format_name, angle=None, 
     topic_memo = _clean_user_topic_memo(custom_topic)
     topic_rules = _topic_context_rules(topic_memo).strip()
     brief = _angle_to_internal_brief(angle)
+    topic_priority = ""
+    if topic_memo:
+        topic_priority = f"""
+## 사용자 지정 핵심 주제 — 최우선 제작 지시
+{topic_memo}
+
+- 이번 영상은 반드시 위 주제를 중심으로 전개한다.
+- 자동으로 눈에 띄는 시황·가격·수급 이슈가 있어도, 위 주제를 밀어내고 다른 이야기로 바꾸지 마라.
+- 첫 3블록 안에 주제를 분명하게 제시하고, 본문과 마지막 확인 기준에서 다시 회수한다.
+- 수집 데이터는 위 주제를 설명하는 근거로 선별해서 쓴다.
+- 근거가 없는 세부 내용은 만들지 않는다.
+- 메모의 대본 기준 날짜가 미래라면 그날 가격·종가·수급을 확인한 것처럼 쓰지 말고, 현재까지 확인된 흐름과 예정 일정만 사용한다.
+- 최종 대본에는 '사용자 메모', '미래 날짜', '예약 작성' 같은 제작 과정 표현을 쓰지 않는다.
+""".strip()
 
     parts = [f"""
 당신은 한국 주식 유튜브 채널의 메인 작가다.
 아래 [수집 데이터]만 근거로 {stock_label} 대본을 작성하라.
 완성 대본만 출력한다. 제목, 목차, 해설, 마크다운, 화면 지시는 쓰지 않는다.
+
+{topic_priority}
 
 ## 최우선 목표
 - 시청자가 그대로 들을 수 있는 방송 구어체 대본.
@@ -3652,19 +3706,6 @@ def _build_compact_script_prompt(stock_name, raw_data, format_name, angle=None, 
 
     if topic_rules:
         parts.append(topic_rules)
-
-    if topic_memo:
-        parts.append(f"""
-## 사용자 지정 대본 주제 / 메모
-- 이번 대본에서 우선 반영할 주제다.
-- 단, 여기에 없는 숫자와 사실은 만들지 마라.
-- 최종 대본에는 "사용자 메모" 같은 제작 과정 표현을 쓰지 마라.
-- 메모에 대본 기준 날짜가 있고 그 날짜가 미래라면, 그날 주가·종가·장중 흐름·수급을 확인한 것처럼 쓰지 마라.
-- 미래 날짜용 대본은 현재까지 확인된 흐름, 예정 일정, 큰 시나리오, 그날 확인할 기준을 중심으로 써라.
-- 단, 최종 대본에는 "미래 날짜", "아직 오지 않은 날짜", "예약 작성", "사전에 작성" 같은 말은 쓰지 마라.
-
-{topic_memo}
-""".strip())
 
     if brief:
         parts.append(f"""
@@ -5842,9 +5883,24 @@ def _final_length_guard_with_openai(client, types, text, raw_data, model, temper
 # ──────────────────────────────────────────────
 # OpenAI → Gemini → OpenAI → Gemini 체인 대본 생성
 # ──────────────────────────────────────────────
-def _build_chain_refine_prompt(current_text, raw_data, format_name=None, stage="gemini_refine"):
+def _build_chain_refine_prompt(current_text, raw_data, format_name=None, stage="gemini_refine",
+                               custom_topic=None):
     """두 모델이 서로 보완하는 체인용 프롬프트. 출력은 항상 완성 대본만 요구한다."""
     canonical_format = SCRIPT_FORMAT_ALIASES.get(format_name, format_name or "")
+    topic_memo = _clean_user_topic_memo(custom_topic)
+    topic_lock = ""
+    if topic_memo:
+        topic_lock = f"""
+## 사용자 지정 핵심 주제 — 이번 편의 중심축
+{topic_memo}
+
+- 위 주제는 참고 메모가 아니라 이번 영상의 중심 질문이다.
+- 초반 3블록 안에서 시청자가 이번 영상의 주제를 분명히 알 수 있게 하라.
+- 본문 데이터는 위 주제를 설명하는 근거로 골라 쓰고, 관련 없는 시황·가격·수급 나열로 중심을 바꾸지 마라.
+- 중반과 마지막 확인 기준에서도 같은 주제를 회수하라.
+- 단, 수집 데이터에 없는 사실·숫자·사건은 만들지 마라. 근거가 부족한 부분은 억지로 단정하지 마라.
+- 최종 대본에는 '사용자 주제', '메모', '지시사항' 같은 제작 과정 표현을 쓰지 마라.
+""".strip()
     weekend_rules = _weekend_big_picture_lock_rules() if (("주말용 사전작성 자료 수집" in str(raw_data or "")) or _format_is_weekend(format_name)) else ""
     if "정프로용" in canonical_format:
         format_lock = """
@@ -5903,6 +5959,8 @@ def _build_chain_refine_prompt(current_text, raw_data, format_name=None, stage="
 ## 대본 포맷
 {canonical_format}
 
+{topic_lock}
+
 [현재 대본]
 {current_text}
 
@@ -5911,7 +5969,8 @@ def _build_chain_refine_prompt(current_text, raw_data, format_name=None, stage="
 """.strip()
 
 
-def _generate_openai_gemini_chain_script(prompt, raw_data, format_name=None, model=None, temperature=0.7):
+def _generate_openai_gemini_chain_script(prompt, raw_data, format_name=None, model=None, temperature=0.7,
+                                          custom_topic=None):
     """OpenAI 초안 → Gemini 다듬기 → OpenAI 어색함 점검 → Gemini 최종 출력."""
     client = _make_openai_client()
     openai_model = model or OPENAI_TEXT_MODEL
@@ -5927,7 +5986,9 @@ def _generate_openai_gemini_chain_script(prompt, raw_data, format_name=None, mod
     if not draft.strip():
         raise RuntimeError("openai 초안 응답이 비어 있습니다.")
 
-    gemini_prompt = _build_chain_refine_prompt(draft, raw_data, format_name=format_name, stage="gemini_refine")
+    gemini_prompt = _build_chain_refine_prompt(
+        draft, raw_data, format_name=format_name, stage="gemini_refine", custom_topic=custom_topic
+    )
     refined = _generate_text_with_gemini(
         model=GEMINI_TEXT_MODEL,
         prompt=gemini_prompt,
@@ -5937,7 +5998,9 @@ def _generate_openai_gemini_chain_script(prompt, raw_data, format_name=None, mod
     if _memo_char_count(refined) < max(2500, int(_memo_char_count(draft) * 0.45)):
         refined = draft
 
-    polish_prompt = _build_chain_refine_prompt(refined, raw_data, format_name=format_name, stage="openai_polish")
+    polish_prompt = _build_chain_refine_prompt(
+        refined, raw_data, format_name=format_name, stage="openai_polish", custom_topic=custom_topic
+    )
     polished = _generate_text_with_openai(
         client=client,
         types=None,
@@ -5949,7 +6012,9 @@ def _generate_openai_gemini_chain_script(prompt, raw_data, format_name=None, mod
     if _memo_char_count(polished) < max(2500, int(_memo_char_count(refined) * 0.55)):
         polished = refined
 
-    final_prompt = _build_chain_refine_prompt(polished, raw_data, format_name=format_name, stage="gemini_final")
+    final_prompt = _build_chain_refine_prompt(
+        polished, raw_data, format_name=format_name, stage="gemini_final", custom_topic=custom_topic
+    )
     final = _generate_text_with_gemini(
         model=GEMINI_TEXT_MODEL,
         prompt=final_prompt,
@@ -5966,15 +6031,25 @@ def _generate_openai_gemini_chain_script(prompt, raw_data, format_name=None, mod
         stats = get_script_quality_stats(final, format_name=format_name)
         score = int(stats.get("quality_score") or 0)
         repair_notes = list(stats.get("quality_reasons") or [])
+        topic_covered, _ = _topic_focus_covered(final, custom_topic)
+        if not topic_covered:
+            topic_keywords = _topic_focus_keywords(custom_topic)
+            repair_notes.insert(
+                0,
+                "사용자가 지정한 핵심 주제가 본문에서 충분히 회수되지 않았습니다. "
+                f"핵심어({', '.join(topic_keywords[:6])})를 초반·중반·마지막 기준에 자연스럽게 반영하세요.",
+            )
         if _memo_char_count(final) < hard_min:
             repair_notes.insert(0, f"분량이 부족합니다. 현재 약 {_memo_char_count(final):,}자이고 최소 약 {hard_min:,}자 이상으로 보강해야 합니다.")
         for key in quality_keys:
             repair_notes.extend(stats.get(key) or [])
-        if score >= 90 and not repair_notes:
+        if score >= 90 and not repair_notes and topic_covered:
             break
-        if score >= 90 and _memo_char_count(final) >= hard_min:
+        if score >= 90 and _memo_char_count(final) >= hard_min and topic_covered:
             break
-        repair_prompt = _build_chain_refine_prompt(final, raw_data, format_name=format_name, stage="gemini_final")
+        repair_prompt = _build_chain_refine_prompt(
+            final, raw_data, format_name=format_name, stage="gemini_final", custom_topic=custom_topic
+        )
         repair_prompt += f"\n\n## 현재 품질 점수: {score}점"
         repair_prompt += "\n## 90점 이상으로 올리기 위해 반드시 해결할 문제\n"
         repair_prompt += "\n".join(f"- {x}" for x in repair_notes[:14])
@@ -6363,6 +6438,7 @@ def generate_ai_script(stock_name="삼성전자", stock_code="005930", format_na
             format_name=format_name,
             model=model or OPENAI_TEXT_MODEL,
             temperature=temperature,
+            custom_topic=custom_topic,
         )
         initial_model = f"{OPENAI_TEXT_MODEL}→{GEMINI_TEXT_MODEL}→{OPENAI_TEXT_MODEL}→{GEMINI_TEXT_MODEL}"
     else:
@@ -6386,6 +6462,11 @@ def generate_ai_script(stock_name="삼성전자", stock_code="005930", format_na
         result_text = clean_generated_script(result_text)
         final_hard_min = WEEKEND_HARD_MIN_SCRIPT_CHARS if ("주말용 사전작성 자료 수집" in str(raw_data or "") or _format_is_weekend(format_name)) else HARD_MIN_SCRIPT_CHARS
         stats = get_script_quality_stats(result_text, format_name=format_name)
+        topic_covered, topic_matches = _topic_focus_covered(result_text, custom_topic)
+        stats["topic_requested"] = bool(_clean_user_topic_memo(custom_topic))
+        stats["topic_covered"] = topic_covered
+        stats["topic_keywords"] = _topic_focus_keywords(custom_topic)
+        stats["topic_matches"] = topic_matches
         stats["length_warnings"] = [] if _memo_char_count(result_text) >= final_hard_min else [f"빠른 모드라 대본이 짧을 수 있습니다. 현재 약 {_memo_char_count(result_text):,}자 / 권장 최소 약 {final_hard_min:,}자입니다."]
         stats["engine"] = engine
         stats["speed_mode"] = "fast"
@@ -6413,12 +6494,25 @@ def generate_ai_script(stock_name="삼성전자", stock_code="005930", format_na
         # 저장 직전 품질이 90점 미만이면 숫자검증/정리 이후 깨진 흐름을 다시 보완한다.
         for final_round in range(2):
             pre_stats = get_script_quality_stats(result_text, format_name=format_name)
-            if int(pre_stats.get("quality_score") or 0) >= 90 and _memo_char_count(result_text) >= (WEEKEND_HARD_MIN_SCRIPT_CHARS if ("주말용 사전작성 자료 수집" in str(raw_data or "") or _format_is_weekend(format_name)) else HARD_MIN_SCRIPT_CHARS):
+            topic_covered, _ = _topic_focus_covered(result_text, custom_topic)
+            if int(pre_stats.get("quality_score") or 0) >= 90 and topic_covered and _memo_char_count(result_text) >= (WEEKEND_HARD_MIN_SCRIPT_CHARS if ("주말용 사전작성 자료 수집" in str(raw_data or "") or _format_is_weekend(format_name)) else HARD_MIN_SCRIPT_CHARS):
                 break
             repair_reasons = list(pre_stats.get("quality_reasons") or [])
+            if not topic_covered:
+                repair_reasons.insert(
+                    0,
+                    "사용자 지정 핵심 주제가 약합니다. "
+                    f"핵심어({', '.join(_topic_focus_keywords(custom_topic)[:6])})를 영상의 중심 질문과 마지막 확인 기준에서 회수하세요.",
+                )
             for key in ("spoken_consistency_warnings", "repetition_artifact_warnings", "cta_flow_warnings", "format_identity_warnings", "jungpro_warnings"):
                 repair_reasons.extend(pre_stats.get(key) or [])
-            repair_prompt = _build_chain_refine_prompt(result_text, raw_data, format_name=format_name, stage="gemini_final")
+            repair_prompt = _build_chain_refine_prompt(
+                result_text,
+                raw_data,
+                format_name=format_name,
+                stage="gemini_final",
+                custom_topic=custom_topic,
+            )
             repair_prompt += f"\n\n## 저장 직전 품질 점수: {int(pre_stats.get('quality_score') or 0)}점"
             repair_prompt += "\n## 90점 이상으로 올리기 위해 반드시 해결할 문제\n"
             repair_prompt += "\n".join(f"- {x}" for x in repair_reasons[:14])
@@ -6445,6 +6539,11 @@ def generate_ai_script(stock_name="삼성전자", stock_code="005930", format_na
                 break
         final_hard_min = WEEKEND_HARD_MIN_SCRIPT_CHARS if ("주말용 사전작성 자료 수집" in str(raw_data or "") or _format_is_weekend(format_name)) else HARD_MIN_SCRIPT_CHARS
         stats = get_script_quality_stats(result_text, format_name=format_name)
+        topic_covered, topic_matches = _topic_focus_covered(result_text, custom_topic)
+        stats["topic_requested"] = bool(_clean_user_topic_memo(custom_topic))
+        stats["topic_covered"] = topic_covered
+        stats["topic_keywords"] = _topic_focus_keywords(custom_topic)
+        stats["topic_matches"] = topic_matches
         stats["length_warnings"] = [] if _memo_char_count(result_text) >= final_hard_min else [f"대본이 기준보다 짧습니다. 현재 약 {_memo_char_count(result_text):,}자 / 권장 최소 약 {final_hard_min:,}자입니다. 저장은 완료했습니다."]
         stats["engine"] = engine
         stats["initial_model"] = initial_model

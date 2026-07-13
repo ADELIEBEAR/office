@@ -53,7 +53,7 @@ function setDept(active, done=[], message=''){
   if($('stageName')) $('stageName').textContent=activeList.length ? activeList.map(id=>document.querySelector(`.office-room[data-dept="${id}"] h3`)?.textContent||id).join(' + ') : (done.length ? '출고 완료' : '의뢰 대기');
 }
 function doneBefore(active){ const i=deptOrder.indexOf(active); return i>0 ? deptOrder.slice(0,i) : []; }
-function payload(engine){ return { stock_name: $('stockName').value.trim(), stock_code: $('stockCode').value.trim(), format_name: $('formatName').value, custom_topic: $('customTopic').value, output_dir: $('outputDir').value, engine: engine || 'chain', raw_data: lastData.raw_data, script: lastData.script, thumbnail_copy: lastData.thumbnail_copy, concepts: selectedConcepts(), infographic_concepts: selectedInfoConcepts(), infographic_color_theme: $('infoTheme')?.value || 'dark_lineart_city', infographic_layout_concept: $('infoLayout')?.value || 'photo_fullbleed', infographic_photo_accent: $('infoPhotoAccent')?.checked ?? true, infographic_custom_color: $('infoCustomColor')?.value || '', image_parallel_workers: Number($('infoWorkers')?.value || 2) }; }
+function payload(engine){ return { stock_name: $('stockName').value.trim(), stock_code: $('stockCode').value.trim(), format_name: $('formatName').value, custom_topic: $('customTopic').value.trim(), output_dir: $('outputDir').value, engine: engine || 'chain', raw_data: lastData.raw_data, script: lastData.script, thumbnail_copy: lastData.thumbnail_copy, concepts: selectedConcepts(), infographic_concepts: selectedInfoConcepts(), infographic_color_theme: $('infoTheme')?.value || 'dark_lineart_city', infographic_layout_concept: $('infoLayout')?.value || 'photo_fullbleed', infographic_photo_accent: $('infoPhotoAccent')?.checked ?? true, infographic_custom_color: $('infoCustomColor')?.value || '', image_parallel_workers: Number($('infoWorkers')?.value || 2) }; }
 async function api(path, body){ const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); const j=await r.json(); if(!j.ok) throw new Error(j.error||'요청 실패'); return j; }
 async function startJob(path, body){
   if(currentJob) return;
@@ -64,9 +64,9 @@ async function startJob(path, body){
   document.body.classList.add('is-running');
   $('globalStatus').textContent='작업 시작';
   $('jobTitle').textContent='작업 #' + currentJob;
-  $('commandJobId').textContent=currentJob;
   $('progressBar').style.width='3%';
   log('제작 의뢰가 접수됐습니다.');
+  if(body?.custom_topic) log('핵심 주제 고정: '+shortTopic(body.custom_topic,54));
   setControlsRunning(true);
   clearInterval(elapsedTimer);
   elapsedTimer=setInterval(updateElapsed,1000);
@@ -90,10 +90,24 @@ function cleanupButtons(){ setControlsRunning(false); document.body.classList.re
 function updateElapsed(){ if(!jobStartedAt) return; const sec=Math.max(0,Math.floor((Date.now()-jobStartedAt)/1000)); const min=String(Math.floor(sec/60)).padStart(2,'0'); const rem=String(sec%60).padStart(2,'0'); if($('elapsedTime')) $('elapsedTime').textContent=`${min}:${rem}`; }
 function statusLabel(status){ return ({queued:'대기',running:'진행중',done:'완료',error:'오류'})[status]||status; }
 function showToast(message,type='info'){ const old=document.querySelector('.app-toast'); if(old) old.remove(); const toast=document.createElement('div'); toast.className=`app-toast ${type}`; toast.textContent=message; document.body.appendChild(toast); requestAnimationFrame(()=>toast.classList.add('show')); setTimeout(()=>{ toast.classList.remove('show'); setTimeout(()=>toast.remove(),250); },4200); }
+function shortTopic(text,limit=38){ const clean=String(text||'').replace(/\s+/g,' ').trim(); return clean.length>limit ? clean.slice(0,limit)+'…' : clean; }
+function updateTopicBrief(){
+  const topic=$('customTopic')?.value||'';
+  const clean=topic.trim();
+  if($('topicCount')) $('topicCount').textContent=String(topic.length);
+  if($('commandTopic')) $('commandTopic').textContent=clean ? shortTopic(clean) : 'AI 자동 선정';
+  if($('autoPilotBtn')) $('autoPilotBtn').textContent=clean ? '✨ 이 주제로 자동 출고' : '✨ AI 자동 주제 출고';
+  const foot=document.querySelector('.topic-foot');
+  if(foot) foot.classList.toggle('ready',Boolean(clean));
+  if($('topicState')) $('topicState').textContent=clean ? '이 주제가 초안부터 최종 검수까지 고정됩니다.' : '비워두면 AI가 주제를 자동 선정합니다.';
+}
 function handleResult(job){
   const r=job.result||{};
   if(r.raw_data){ lastData.raw_data=r.raw_data; $('rawOut').value=r.raw_data; }
   if(r.script){ lastData.script=r.script; $('scriptOut').value=r.script; }
+  if(r.stats?.topic_requested){
+    log(r.stats.topic_covered ? '핵심 주제 반영 검사 완료' : '핵심 주제 반영이 약해 결과를 직접 확인해 주세요.');
+  }
   if(r.thumbnail_copy){ lastData.thumbnail_copy=r.thumbnail_copy; $('thumbOut').value=r.thumbnail_copy; }
   if(Array.isArray(r.concepts)){ lastData.thumbnail_concepts=r.concepts; renderConcepts(r.concepts); }
   if(Array.isArray(r.items)){ lastData.thumbnail_images=r.items; renderGallery(r.items); $('thumbOut').value = JSON.stringify(r,null,2); }
@@ -234,5 +248,16 @@ $('selectAllConcepts').onclick=()=>{ lastData.thumbnail_concepts=(lastData.thumb
 $('clearConcepts').onclick=()=>{ lastData.thumbnail_concepts=(lastData.thumbnail_concepts||[]).map(c=>({...c,selected:false})); renderConcepts(lastData.thumbnail_concepts); };
 $('selectAllInfo').onclick=()=>{ lastData.infographic_concepts=(lastData.infographic_concepts||[]).map(c=>({...c,selected:true})); renderInfoConcepts(lastData.infographic_concepts); };
 $('clearInfo').onclick=()=>{ lastData.infographic_concepts=(lastData.infographic_concepts||[]).map(c=>({...c,selected:false})); renderInfoConcepts(lastData.infographic_concepts); };
+$('customTopic').addEventListener('input',updateTopicBrief);
+document.querySelectorAll('.topic-chip').forEach(chip=>{
+  chip.addEventListener('click',()=>{
+    const text=String(chip.dataset.topic||'').trim();
+    const current=$('customTopic').value.trim();
+    if(text && !current.includes(text)) $('customTopic').value=current ? `${current}\n${text}` : text;
+    updateTopicBrief();
+    $('customTopic').focus();
+  });
+});
 loadConfig().catch(e=>showToast(e.message,'error'));
+updateTopicBrief();
 setDept(null,[]);
