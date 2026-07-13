@@ -29,6 +29,7 @@ const deptSceneProps = {
 };
 function buildTycoonOffice(){
   let totalCrew=0;
+  let spriteCursor=0;
   document.querySelectorAll('.office-room').forEach(room=>{
     if(room.querySelector('.tycoon-scene')) return;
     const dept=room.dataset.dept||'planning';
@@ -37,7 +38,10 @@ function buildTycoonOffice(){
     totalCrew+=crew;
     while(names.length<crew) names.push(`팀원 ${names.length+1}`);
     const props=deptSceneProps[dept]||['업무 데스크','자료 보드'];
-    const agents=names.slice(0,4).map((name,index)=>`<span class="pixel-agent agent-${index+1}" title="${escapeHtml(name)}"><i class="pixel-head"></i><i class="pixel-body"></i><i class="pixel-legs"></i><b>${escapeHtml(name)}</b></span>`).join('');
+    const agents=names.slice(0,4).map((name,index)=>{
+      const sprite=(spriteCursor++%9)+1;
+      return `<span class="pixel-agent agent-${index+1} sprite-${sprite}" title="${escapeHtml(name)}"><i class="pixel-head"></i><i class="pixel-body"></i><i class="pixel-legs"></i><b>${escapeHtml(name)}</b></span>`;
+    }).join('');
     const scene=document.createElement('div');
     scene.className='tycoon-scene';
     scene.setAttribute('aria-label',`${room.querySelector('h3')?.textContent||'부서'} 사무실`);
