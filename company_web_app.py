@@ -59,7 +59,12 @@ def _prime_legacy_runtime_config():
         if legacy_values:
             break
     for key in allowed:
-        if not local_values.get(key) and not os.environ.get(key) and legacy_values.get(key):
+        # 명시적으로 관리하는 로컬 설정을 오래된 Windows 환경변수보다 우선한다.
+        # 과거에 등록한 OPENAI_API_KEY가 환경변수에 남아 있으면 결제가 끝난 프로젝트 키를
+        # 계속 집어드는 문제가 있으므로: 오피스 config > 기존 도구 config > 환경변수 순서다.
+        if local_values.get(key):
+            os.environ[key] = local_values[key]
+        elif legacy_values.get(key):
             os.environ[key] = legacy_values[key]
 
 
