@@ -53,3 +53,8 @@ python company_web_app.py
 
 `config.txt`, API 키, 출력물, 백업, DART 대용량 XML은 Git에 올리지 않습니다.
 로컬에서만 사용할 경우 `config_template.txt`를 참고해서 `config.txt`를 따로 만드세요.
+
+오피스의 `config.txt`에서 KRX/OpenAI/Gemini 설정이 비어 있으면 기존
+`stock_script_tool_v2_1/config.txt` 설정을 실행 중에만 자동으로 이어받습니다.
+다른 위치의 설정을 쓰려면 `STOCK_SCRIPT_CONFIG` 환경변수에 해당 파일 경로를 지정하세요.
+키 값은 오피스 파일로 복사하거나 Git에 저장하지 않습니다.

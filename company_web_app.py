@@ -19,10 +19,55 @@ from urllib.parse import quote
 
 from flask import Flask, jsonify, request, send_file, send_from_directory
 
+ROOT = Path(__file__).resolve().parent
+
+
+def _read_simple_config(path: Path) -> Dict[str, str]:
+    """KEY=VALUE 형식의 로컬 설정을 읽되 값은 외부에 노출하지 않는다."""
+    values: Dict[str, str] = {}
+    if not path.exists():
+        return values
+    try:
+        for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip('"').strip("'")
+    except Exception:
+        return {}
+    return values
+
+
+def _prime_legacy_runtime_config():
+    """오피스 설정이 비어 있으면 기존 주식 도구 설정을 런타임에만 이어받는다."""
+    allowed = {
+        "KRX_ID", "KRX_PW", "DART_API_KEY",
+        "OPENAI_API_KEY", "OPENAI_TEXT_MODEL", "OPENAI_IMAGE_MODEL", "OPENAI_MAX_OUTPUT_TOKENS",
+        "GEMINI_API_KEY", "GEMINI_TEXT_MODEL",
+        "BATCH_ENGINE_MODE", "BATCH_PARALLEL_WORKERS",
+    }
+    local_values = _read_simple_config(ROOT / "config.txt")
+    configured_path = os.environ.get("STOCK_SCRIPT_CONFIG", "").strip()
+    candidates = []
+    if configured_path:
+        candidates.append(Path(configured_path).expanduser())
+    candidates.append(Path.home() / "Desktop" / "혼합짬뽕탕" / "레전드" / "stock_script_tool_v2_1" / "config.txt")
+    legacy_values: Dict[str, str] = {}
+    for candidate in candidates:
+        legacy_values = _read_simple_config(candidate)
+        if legacy_values:
+            break
+    for key in allowed:
+        if not local_values.get(key) and not os.environ.get(key) and legacy_values.get(key):
+            os.environ[key] = legacy_values[key]
+
+
+_prime_legacy_runtime_config()
+
 import market_research as mr
 import infographic_engine as ie
 
-ROOT = Path(__file__).resolve().parent
 WEB_DIR = ROOT / "web_company"
 OUTPUT_DIR = Path(getattr(mr, "OUTPUT_DIR", ROOT / "output"))
 
