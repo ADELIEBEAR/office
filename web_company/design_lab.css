@@ -1963,3 +1963,143 @@ button.primary,.autopilot-btn {
   .ambient-worker{width:50px;height:68px;opacity:.78}
   .ambient-7,.ambient-8{display:none}
 }
+
+/* Clean tycoon stage — 캐릭터 수보다 역할과 시선 흐름을 우선 */
+.company-map .office-room {
+  width:132px;
+  min-width:132px;
+  height:148px;
+  min-height:148px;
+  border:0;
+  background:transparent;
+  box-shadow:none;
+}
+.company-map .office-room:hover,
+.company-map .office-room.active,
+.company-map .office-room.done {
+  border:0;
+  background:transparent;
+  box-shadow:none;
+}
+.company-map .planning { left:56%; top:19%; width:132px; }
+.company-map .research { left:5%; top:50%; width:132px; }
+.company-map .writing { left:26%; top:51%; width:132px; }
+.company-map .review { left:46%; top:50%; width:132px; }
+.company-map .design { left:65%; top:49%; width:132px; }
+.company-map .video { left:78%; top:70%; width:132px; }
+.company-map .shipping { left:auto; right:5%; top:36%; width:132px; }
+
+.company-map .room-head {
+  top:-6px;
+  min-width:72px;
+  width:auto;
+  max-width:112px;
+  padding:5px 20px 5px 9px;
+  border:1px solid rgba(255,255,255,.42);
+  border-radius:7px;
+  background:rgba(35,57,93,.84);
+  box-shadow:0 3px 0 rgba(25,42,69,.28),0 7px 14px rgba(49,33,20,.13);
+  backdrop-filter:blur(5px);
+  opacity:.82;
+}
+.company-map .room-head h3 {
+  overflow:hidden;
+  color:#fffaf0;
+  font-size:9px;
+  text-overflow:ellipsis;
+}
+.company-map .room-head > span {
+  right:7px;
+  top:50%;
+  width:7px;
+  height:7px;
+  padding:0;
+  transform:translateY(-50%);
+  border:1px solid rgba(255,255,255,.65);
+  border-radius:50%;
+  background:#a8b1bf;
+  color:transparent;
+  font-size:0;
+}
+.company-map .office-room.active .room-head {
+  background:color-mix(in srgb,var(--uniform) 78%,#24395e);
+  opacity:1;
+  animation:departmentTagPulse 1.15s ease-in-out infinite alternate;
+}
+.company-map .office-room.active .room-head > span { background:#72e39a; box-shadow:0 0 0 3px rgba(114,227,154,.2); }
+.company-map .office-room.done .room-head > span { background:#f4c567; }
+
+.company-map .tycoon-scene { inset:17px -20px 0; height:132px; }
+.office-room .pixel-agent {
+  width:108px;
+  height:132px;
+  opacity:.96;
+  filter:drop-shadow(0 8px 4px rgba(62,39,22,.24));
+}
+.office-room .agent-1 {
+  left:50%;
+  right:auto;
+  top:0;
+  margin-left:-54px;
+}
+.office-room .agent-2 {
+  display:block;
+  left:auto;
+  right:-16px;
+  top:8px;
+  width:92px;
+  height:116px;
+  opacity:0;
+  visibility:hidden;
+  transition:opacity .28s ease;
+}
+.office-room.active .agent-1 { left:24%; margin-left:-54px; }
+.office-room.active .agent-2 { opacity:.94; visibility:visible; }
+.company-map .shipping .agent-2,
+.company-map .video .agent-2 { display:block; }
+.company-map .office-room > .task-chip { display:none; }
+.company-map .office-room > .bubble {
+  bottom:112%;
+  max-width:150px;
+  border-width:2px;
+  padding:6px 8px;
+  font-size:8px;
+}
+
+.office-ambient-crew { z-index:3; }
+.ambient-worker { opacity:0; visibility:hidden; }
+.ambient-4,.ambient-5,.ambient-7 {
+  visibility:visible;
+  opacity:.68;
+}
+.ambient-4 { right:9%; top:43%; }
+.ambient-5 { right:17%; top:68%; }
+.ambient-7 { right:2%; top:79%; }
+.is-running .ambient-3,
+.is-running .ambient-4,
+.is-running .ambient-5,
+.is-running .ambient-6,
+.is-running .ambient-7,
+.is-running .ambient-8 {
+  visibility:visible;
+  opacity:.8;
+}
+.is-running .ambient-1,
+.is-running .ambient-2 { display:none; }
+.is-running .ambient-6 { opacity:.9; }
+
+@keyframes departmentTagPulse {
+  from { transform:translateX(-50%) translateY(0); }
+  to { transform:translateX(-50%) translateY(-2px); }
+}
+
+@media(max-width:1250px){
+  .company-map .office-room{width:112px;min-width:112px;transform:scale(.9)}
+  .company-map .planning{left:54%}
+  .company-map .research{left:3%}
+  .company-map .writing{left:24%}
+  .company-map .review{left:44%}
+  .company-map .design{left:63%}
+  .company-map .video{left:76%}
+  .company-map .shipping{right:3%}
+}
