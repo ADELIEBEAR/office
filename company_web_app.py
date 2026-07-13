@@ -91,7 +91,9 @@ def _new_job(kind: str, title: str) -> str:
             "status": "queued",
             "progress": 0,
             "department": "planning",
+            "active_departments": ["planning"],
             "message": "작업 대기중",
+            "events": [],
             "result": None,
             "error": None,
             "created_at": time.time(),
@@ -105,6 +107,20 @@ def _set_job(job_id: str, **updates):
         job = _jobs.get(job_id)
         if not job:
             return
+        department = updates.get("department")
+        if department and "active_departments" not in updates:
+            updates["active_departments"] = [department]
+        message = str(updates.get("message") or "").strip()
+        if message and message != job.get("message"):
+            events = list(job.get("events") or [])
+            events.append({
+                "id": len(events) + 1,
+                "at": time.time(),
+                "department": department or job.get("department") or "planning",
+                "message": message,
+                "progress": int(updates.get("progress", job.get("progress", 0)) or 0),
+            })
+            updates["events"] = events[-80:]
         job.update(updates)
         job["updated_at"] = time.time()
 
@@ -112,9 +128,27 @@ def _set_job(job_id: str, **updates):
 def _run_job(job_id: str, target, *args, **kwargs):
     try:
         result = target(job_id, *args, **kwargs)
-        _set_job(job_id, status="done", progress=100, department="shipping", message="출고 완료", result=result)
+        _set_job(
+            job_id,
+            status="done",
+            progress=100,
+            department="shipping",
+            active_departments=[],
+            message="출고 완료",
+            result=result,
+            finished_at=time.time(),
+        )
     except Exception as exc:  # noqa: BLE001 - UI에 그대로 보여주기 위한 최종 방어
-        _set_job(job_id, status="error", progress=100, department="review", message="오류 발생", error=str(exc))
+        _set_job(
+            job_id,
+            status="error",
+            progress=100,
+            department="review",
+            active_departments=[],
+            message="오류 발생",
+            error=str(exc),
+            finished_at=time.time(),
+        )
 
 
 def _start_job(kind: str, title: str, target, *args, **kwargs):
@@ -710,7 +744,13 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
     if thumbnail_copy and not Path(thumb_copy_path).exists():
         thumb_copy_path = _write_text_file(package_dir / "02_썸네일문구.txt", thumbnail_copy)
 
-    _set_job(job_id, progress=65, department="design", message="4/6 디자인실·영상팀 병렬 출고 시작")
+    _set_job(
+        job_id,
+        progress=65,
+        department="design",
+        active_departments=["design", "video"],
+        message="4/6 디자인실과 영상팀이 동시에 출고 작업을 시작합니다",
+    )
 
     def run_thumbnail_image() -> Dict[str, Any]:
         try:
@@ -739,14 +779,32 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
             executor.submit(run_thumbnail_image): "thumbnail",
             executor.submit(run_voice_export): "voice",
         }
+        pending_labels = set(futures.values())
         for future in as_completed(futures):
             label = futures[future]
+            pending_labels.discard(label)
+            remaining_departments = [
+                dept for key, dept in (("thumbnail", "design"), ("voice", "video"))
+                if key in pending_labels
+            ]
             if label == "thumbnail":
                 thumbnail_result = future.result()
-                _set_job(job_id, progress=78, department="design", message="썸네일 이미지 출고 완료 · 음성팀 병렬 진행")
+                _set_job(
+                    job_id,
+                    progress=78,
+                    department="design",
+                    active_departments=remaining_departments,
+                    message="디자인실 썸네일 이미지 완료 · 영상팀은 계속 작업중",
+                )
             else:
                 voice_result = future.result()
-                _set_job(job_id, progress=84, department="video", message="음성 파일 출고 완료 · 디자인실 병렬 진행")
+                _set_job(
+                    job_id,
+                    progress=84,
+                    department="video",
+                    active_departments=remaining_departments,
+                    message="영상팀 음성 파일 완료 · 디자인실은 계속 작업중",
+                )
 
     _set_job(job_id, progress=96, department="shipping", message="6/6 출고 목록 정리")
     manifest = {

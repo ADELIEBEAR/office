@@ -78,8 +78,9 @@
     <main class="workspace">
       <header class="topbar">
         <div>
-          <div class="eyebrow">COMPANY MAP</div>
-          <h2>내 AI 제작 회사 운영판</h2>
+          <div class="eyebrow">AI STUDIO COMMAND CENTER</div>
+          <h2>오늘의 제작 본부</h2>
+          <p class="topbar-copy">한 번 의뢰하면 부서별 진행 상황과 결과물이 여기서 바로 보입니다.</p>
         </div>
         <div class="top-actions">
           <button class="autopilot-btn" id="autoPilotBtn">✨ 딸깍 자동 출고</button>
@@ -87,23 +88,22 @@
         </div>
       </header>
 
-      <section class="company-map" id="companyMap">
-        <svg class="flow-lines" viewBox="0 0 1000 520" preserveAspectRatio="none">
-          <path id="linePlanWrite" d="M230 145 C330 120, 380 120, 480 150" />
-          <path id="lineResearchWrite" d="M245 370 C330 340, 390 260, 480 190" />
-          <path id="lineWriteReview" d="M560 205 C590 260, 585 320, 560 370" />
-          <path id="lineReviewDesign" d="M620 370 C710 330, 760 240, 825 205" />
-          <path id="lineDesignShip" d="M850 235 C870 300, 865 365, 830 420" />
-          <path id="lineReviewShip" d="M620 405 C700 430, 740 440, 800 435" />
-        </svg>
+      <section class="command-strip" aria-label="제작 현황">
+        <div><span>현재 단계</span><strong id="stageName">의뢰 대기</strong></div>
+        <div><span>가동 부서</span><strong id="activeTeamCount">0개 팀</strong></div>
+        <div><span>투입 인원</span><strong id="activeCrewCount">0명</strong></div>
+        <div><span>경과 시간</span><strong id="elapsedTime">00:00</strong></div>
+        <div class="command-id"><span>작업 번호</span><strong id="commandJobId">-</strong></div>
+      </section>
 
-        <div class="office-room planning" data-dept="planning"><div class="worker"><i></i><i></i></div><h3>기획실</h3><b>주제/각도 선정</b><p>무엇을 말할지 먼저 잡습니다.</p><em class="task-chip">브리핑 대기</em><i class="bubble">오늘 영상 방향 잡는 중</i><span>대기</span></div>
-        <div class="office-room research" data-dept="research"><div class="worker"><i></i><i></i></div><h3>리서치 본부</h3><b>뉴스·공시·수급</b><p>자료를 모으고 국면을 분리합니다.</p><em class="task-chip">데이터 대기</em><i class="bubble">공시랑 수급 확인할게요</i><span>대기</span></div>
-        <div class="office-room writing" data-dept="writing"><div class="worker"><i></i><i></i></div><h3>작가팀</h3><b>구어체 대본</b><p>후킹과 흐름을 방송 말투로 씁니다.</p><em class="task-chip">원고 대기</em><i class="bubble">말로 읽히게 다듬는 중</i><span>대기</span></div>
-        <div class="office-room review" data-dept="review"><div class="worker"><i></i><i></i></div><h3>검수팀</h3><b>숫자·국면 체크</b><p>창작 수치와 튀는 표현을 걸러냅니다.</p><em class="task-chip">검수 대기</em><i class="bubble">숫자랑 장중 표현 볼게요</i><span>대기</span></div>
-        <div class="office-room design" data-dept="design"><div class="worker"><i></i><i></i></div><h3>디자인실</h3><b>썸네일·인포그래픽</b><p>문구와 시각 자료를 만듭니다.</p><em class="task-chip">시안 대기</em><i class="bubble">클릭될 그림으로 바꾸는 중</i><span>대기</span></div>
-        <div class="office-room video" data-dept="video"><div class="worker"><i></i><i></i></div><h3>영상팀</h3><b>슬라이드·음성·MP4</b><p>음성과 영상 재료를 정리합니다.</p><em class="task-chip">음성 대기</em><i class="bubble">일레븐랩스 음성 준비</i><span>대기</span></div>
-        <div class="office-room shipping" data-dept="shipping"><div class="worker"><i></i><i></i></div><h3>출고 데스크</h3><b>저장·복사·폴더</b><p>결과물을 업로드 준비 상태로 넘깁니다.</p><em class="task-chip">출고 대기</em><i class="bubble">한 폴더로 포장합니다</i><span>대기</span></div>
+      <section class="company-map" id="companyMap">
+        <div class="office-room planning" data-dept="planning" data-crew="2"><div class="room-head"><div class="worker"><i></i><i></i></div><div><h3>기획실</h3><b>주제·각도 설계</b></div><span>대기</span></div><p>의뢰를 읽고 제작 순서를 정합니다.</p><div class="crew-list"><em>기획 PM</em><em>콘텐츠 전략</em></div><i class="bubble">오늘 영상 방향을 잡고 있어요</i><small class="task-chip">브리핑 대기</small></div>
+        <div class="office-room research" data-dept="research" data-crew="4"><div class="room-head"><div class="worker"><i></i><i></i></div><div><h3>리서치 본부</h3><b>뉴스·공시·수급</b></div><span>대기</span></div><p>가격, 뉴스, 공시와 시장 국면을 교차 확인합니다.</p><div class="crew-list"><em>뉴스</em><em>공시</em><em>수급</em><em>데이터</em></div><i class="bubble">최신 자료를 나눠서 확인할게요</i><small class="task-chip">데이터 대기</small></div>
+        <div class="office-room writing" data-dept="writing" data-crew="3"><div class="room-head"><div class="worker"><i></i><i></i></div><div><h3>작가팀</h3><b>구어체 대본</b></div><span>대기</span></div><p>후킹, 흐름, 말맛을 포맷에 맞게 조립합니다.</p><div class="crew-list"><em>메인 작가</em><em>구성 작가</em><em>말투 편집</em></div><i class="bubble">끝까지 말로 읽히게 다듬을게요</i><small class="task-chip">원고 대기</small></div>
+        <div class="office-room review" data-dept="review" data-crew="3"><div class="room-head"><div class="worker"><i></i><i></i></div><div><h3>검수팀</h3><b>숫자·국면·말투</b></div><span>대기</span></div><p>수치 창작, 날짜 혼동과 튀는 표현을 점검합니다.</p><div class="crew-list"><em>팩트체크</em><em>국면검수</em><em>말투검수</em></div><i class="bubble">숫자와 시점 표현을 확인할게요</i><small class="task-chip">검수 대기</small></div>
+        <div class="office-room design" data-dept="design" data-crew="3"><div class="room-head"><div class="worker"><i></i><i></i></div><div><h3>디자인실</h3><b>썸네일·인포그래픽</b></div><span>대기</span></div><p>문구와 시각 자료를 클릭되는 화면으로 만듭니다.</p><div class="crew-list"><em>아트 디렉터</em><em>썸네일</em><em>인포그래픽</em></div><i class="bubble">대본의 핵심 장면을 그리고 있어요</i><small class="task-chip">시안 대기</small></div>
+        <div class="office-room video" data-dept="video" data-crew="3"><div class="room-head"><div class="worker"><i></i><i></i></div><div><h3>영상팀</h3><b>음성·자막·영상</b></div><span>대기</span></div><p>일레븐랩스 음성과 영상 재료를 정리합니다.</p><div class="crew-list"><em>보이스</em><em>자막</em><em>편집</em></div><i class="bubble">방송용 음성을 만들고 있어요</i><small class="task-chip">음성 대기</small></div>
+        <div class="office-room shipping" data-dept="shipping" data-crew="2"><div class="room-head"><div class="worker"><i></i><i></i></div><div><h3>출고 데스크</h3><b>파일·폴더 정리</b></div><span>대기</span></div><p>완성물을 날짜와 주제별 한 폴더로 포장합니다.</p><div class="crew-list"><em>출고 담당</em><em>파일 검수</em></div><i class="bubble">결과물을 한 폴더에 정리할게요</i><small class="task-chip">출고 대기</small></div>
       </section>
 
       <section class="job-panel">
