@@ -2103,3 +2103,166 @@ button.primary,.autopilot-btn {
   .company-map .video{left:76%}
   .company-map .shipping{right:3%}
 }
+
+/* RPG pixel office — 작은 도트 유닛과 탑다운 사무실 */
+.crew-lineup-art { display:none; }
+.company-map {
+  height:clamp(520px,36vw,650px);
+  max-height:650px;
+  padding:52px 0 0;
+  border:5px solid #1c2837;
+  border-radius:8px;
+  background:#243244 url('assets/pixel_office_floor.png') center/100% 100% no-repeat;
+  box-shadow:inset 0 0 0 3px #4a5a68,0 9px 0 #101924,0 18px 34px rgba(24,29,36,.24);
+  image-rendering:pixelated;
+}
+.company-map::before {
+  inset:52px 0 0;
+  background:linear-gradient(rgba(255,255,255,.025),rgba(0,0,0,.05));
+}
+.company-map::after { height:3px; background:linear-gradient(90deg,#5da2c6,#80b47b,#e0a35f); opacity:.72; }
+.tycoon-map-head {
+  height:52px;
+  border-bottom:3px solid #101924;
+  background:rgba(28,40,55,.94);
+  color:#e9eef3;
+}
+.tycoon-map-head span,.tycoon-map-head strong { color:#e9eef3; }
+.tycoon-resources em { border:1px solid #536476; background:#243244; color:#b9c8d5; box-shadow:2px 2px 0 #0f1822; }
+.tycoon-resources b { color:#83c7e8; }
+
+.company-map .office-room,
+.company-map .office-room:hover,
+.company-map .office-room.active,
+.company-map .office-room.done {
+  width:74px;
+  min-width:74px;
+  height:92px;
+  min-height:92px;
+  border:0;
+  background:transparent;
+  box-shadow:none;
+  transform:none;
+}
+.company-map .research { left:9%; top:29%; }
+.company-map .writing { left:29%; top:29%; }
+.company-map .review { left:49%; top:29%; }
+.company-map .design { left:9%; top:65%; }
+.company-map .video { left:29%; top:65%; }
+.company-map .shipping { left:49%; right:auto; top:65%; }
+.company-map .planning { left:79%; top:29%; }
+
+.company-map .room-head {
+  top:-20px;
+  min-width:64px;
+  max-width:104px;
+  padding:4px 16px 4px 7px;
+  border:2px solid #111b28;
+  border-radius:3px;
+  background:#263a52;
+  box-shadow:2px 2px 0 rgba(8,13,20,.7);
+  opacity:0;
+  transition:opacity .15s ease,transform .15s ease;
+  backdrop-filter:none;
+}
+.company-map .office-room:hover .room-head,
+.company-map .office-room.active .room-head,
+.company-map .office-room.done .room-head { opacity:1; }
+.company-map .room-head h3 { color:#eef6fa; font-size:8px; }
+.company-map .room-head > span { width:6px;height:6px;right:5px;background:#8191a0; }
+.company-map .office-room.active .room-head { background:#2d6381; animation:none; }
+
+.company-map .tycoon-scene { inset:0 -18px; height:92px; }
+.office-room .pixel-agent,
+.ambient-worker {
+  width:48px;
+  height:72px;
+  border:0;
+  border-radius:0;
+  background-color:transparent;
+  background-image:url('assets/pixel_workers.png');
+  background-repeat:no-repeat;
+  background-size:600% 900%;
+  image-rendering:pixelated;
+  mix-blend-mode:normal;
+  filter:drop-shadow(2px 3px 0 rgba(13,20,28,.34));
+}
+.office-room .sprite-1,.ambient-worker.sprite-1 { background-position-y:0%; }
+.office-room .sprite-2,.ambient-worker.sprite-2 { background-position-y:12.5%; }
+.office-room .sprite-3,.ambient-worker.sprite-3 { background-position-y:25%; }
+.office-room .sprite-4,.ambient-worker.sprite-4 { background-position-y:37.5%; }
+.office-room .sprite-5,.ambient-worker.sprite-5 { background-position-y:50%; }
+.office-room .sprite-6,.ambient-worker.sprite-6 { background-position-y:62.5%; }
+.office-room .sprite-7,.ambient-worker.sprite-7 { background-position-y:75%; }
+.office-room .sprite-8,.ambient-worker.sprite-8 { background-position-y:87.5%; }
+.office-room .sprite-9,.ambient-worker.sprite-9 { background-position-y:100%; }
+.office-room .pixel-agent {
+  animation:rpgIdleFrames 1.15s steps(1,end) infinite;
+}
+.office-room .agent-1 { left:50%;top:10px;margin-left:-24px; }
+.office-room .agent-2 { display:block;left:auto;right:-8px;top:12px;width:48px;height:72px;opacity:0;visibility:hidden; }
+.office-room.active .agent-1 { left:12%;margin-left:0;animation:rpgWorkFrames .48s steps(1,end) infinite; }
+.office-room.active .agent-2 { opacity:1;visibility:visible;animation:rpgWorkFrames .55s steps(1,end) infinite reverse; }
+.office-room .pixel-agent > b { display:none; }
+.company-map .office-room > .bubble {
+  bottom:102%;
+  max-width:145px;
+  border:2px solid #172333;
+  border-radius:3px;
+  background:#f5f1e7;
+  box-shadow:3px 3px 0 rgba(11,17,25,.45);
+  color:#263244;
+  font-size:8px;
+}
+
+.office-ambient-crew { inset:52px 0 0;z-index:6; }
+.ambient-worker { width:40px;height:60px;animation:rpgIdleFrames 1.25s steps(1,end) infinite; }
+.ambient-4 { right:14%;top:72%; }
+.ambient-5 { right:4%;top:72%; }
+.ambient-7 { right:2%;top:43%; }
+.is-running .ambient-3 { left:72%;top:35%;animation:rpgWorkFrames .62s steps(1,end) infinite; }
+.is-running .ambient-6 { left:60%;top:72%;animation:rpgWalkAcross 9s linear infinite; }
+.is-running .ambient-8 { left:70%;top:72%;animation:rpgIdleFrames .9s steps(1,end) infinite; }
+.office-mail-runner { display:none; }
+
+.voice-lab {
+  margin-bottom:14px;
+  border:1px solid rgba(173,137,91,.34);
+  border-radius:22px;
+  padding:16px;
+  background:rgba(255,253,248,.9);
+  box-shadow:0 14px 34px rgba(88,58,28,.11);
+}
+.voice-status { color:#7d6f62;font-size:11px;font-weight:700; }
+.voice-gallery { display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px; }
+.voice-card { display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;border:1px solid #d8c2a2;border-radius:14px;padding:10px;background:#fffaf0; }
+.voice-card div { min-width:0; }
+.voice-card b,.voice-card span { display:block; }
+.voice-card b { color:#2f3a50;font-size:12px; }
+.voice-card span { color:#887767;font-size:9px;margin-top:3px; }
+.voice-card audio { grid-column:1/-1;width:100%;height:32px; }
+.voice-card a { color:#9f5f44;font-size:10px;font-weight:800;text-decoration:none; }
+.package-grid { grid-template-columns:repeat(5,1fr); }
+
+@keyframes rpgIdleFrames {
+  0%,48% { background-position-x:0%;transform:translateY(0); }
+  49%,100% { background-position-x:20%;transform:translateY(-1px); }
+}
+@keyframes rpgWorkFrames {
+  0%,48% { background-position-x:40%;transform:translateY(0); }
+  49%,100% { background-position-x:60%;transform:translateY(-1px); }
+}
+@keyframes rpgWalkAcross {
+  0% { left:58%;background-position-x:80%;transform:translateY(0) scaleX(1); }
+  25% { background-position-x:100%;transform:translateY(-2px) scaleX(1); }
+  49% { left:88%;background-position-x:80%;transform:translateY(0) scaleX(1); }
+  50% { left:88%;background-position-x:100%;transform:translateY(0) scaleX(-1); }
+  75% { background-position-x:80%;transform:translateY(-2px) scaleX(-1); }
+  100% { left:58%;background-position-x:100%;transform:translateY(0) scaleX(-1); }
+}
+
+@media(max-width:1200px){
+  .company-map{height:540px}
+  .company-map .office-room{transform:scale(.9);transform-origin:center bottom}
+  .package-grid{grid-template-columns:repeat(3,1fr)}
+}

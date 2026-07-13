@@ -63,6 +63,7 @@
           <button id="thumbImgBtn">🎨 이미지 시안</button>
           <button id="infoConceptBtn">📊 인포 기획</button>
           <button id="infoImgBtn">🖼 인포 이미지</button>
+          <button id="voiceBtn">🎙 일레븐랩스 음성</button>
           <button id="openOutputBtn">📁 출고 폴더</button>
         </div>
       </section>
@@ -83,6 +84,29 @@
           <option value="3">3개 빠름</option>
           <option value="4">4개 공격적</option>
         </select>
+      </details>
+
+      <details class="control-card compact sidebar-details">
+        <summary>일레븐랩스 음성 설정</summary>
+        <label>보이스 ID</label>
+        <input id="voiceId" placeholder="비워두면 config.txt 설정 사용" />
+        <label>음성 모델</label>
+        <select id="voiceModel">
+          <option value="eleven_multilingual_v2" selected>Multilingual v2 · 안정적</option>
+          <option value="eleven_v3">Eleven v3 · 표현력</option>
+        </select>
+        <label>음성 병렬 작업 수</label>
+        <select id="voiceWorkers">
+          <option value="1">1개 안정</option>
+          <option value="2" selected>2개 권장</option>
+          <option value="3">3개 빠름</option>
+        </select>
+        <div class="two-grid">
+          <div><label>안정성</label><input id="voiceStability" type="number" value="0.42" min="0" max="1" step="0.05" /></div>
+          <div><label>유사도</label><input id="voiceSimilarity" type="number" value="0.82" min="0" max="1" step="0.05" /></div>
+        </div>
+        <label>스타일 강도</label>
+        <input id="voiceStyle" type="number" value="0.22" min="0" max="1" step="0.05" />
       </details>
     </aside>
 
@@ -141,7 +165,8 @@
           <div class="package-card"><b>자료</b><strong>-</strong><small>수집 데이터</small></div>
           <div class="package-card"><b>대본</b><strong>-</strong><small>완성 글자수</small></div>
           <div class="package-card"><b>썸네일</b><strong>-</strong><small>이미지/후보</small></div>
-          <div class="package-card"><b>음성</b><strong>-</strong><small>mp3 파일</small></div>
+          <div class="package-card"><b>인포그래픽</b><strong>-</strong><small>슬라이드 이미지</small></div>
+          <div class="package-card"><b>음성</b><strong>-</strong><small>ElevenLabs mp3</small></div>
         </div>
         <div class="package-folder" id="packageFolder"></div>
       </section>
@@ -181,6 +206,19 @@
         </div>
         <div class="gallery" id="infoGallery">
           <div class="empty-card">인포 이미지를 생성하면 슬라이드 시안이 여기에 표시됩니다.</div>
+        </div>
+      </section>
+
+      <section class="voice-lab">
+        <div class="lab-head">
+          <div>
+            <div class="eyebrow">VOICE ROOM</div>
+            <h3>일레븐랩스 음성팀</h3>
+          </div>
+          <span class="voice-status" id="voiceStatus">대본 생성 후 음성을 만들 수 있습니다.</span>
+        </div>
+        <div class="voice-gallery" id="voiceGallery">
+          <div class="empty-card">생성된 음성 파트가 재생 버튼과 함께 여기에 표시됩니다.</div>
         </div>
       </section>
 

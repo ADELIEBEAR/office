@@ -128,7 +128,7 @@ function setDept(active, done=[], message=''){
   if($('stageName')) $('stageName').textContent=activeList.length ? activeList.map(id=>document.querySelector(`.office-room[data-dept="${id}"] h3`)?.textContent||id).join(' + ') : (done.length ? '출고 완료' : '의뢰 대기');
 }
 function doneBefore(active){ const i=deptOrder.indexOf(active); return i>0 ? deptOrder.slice(0,i) : []; }
-function payload(engine){ return { stock_name: $('stockName').value.trim(), stock_code: $('stockCode').value.trim(), format_name: $('formatName').value, custom_topic: $('customTopic').value.trim(), output_dir: $('outputDir').value, engine: engine || 'chain', raw_data: lastData.raw_data, script: lastData.script, thumbnail_copy: lastData.thumbnail_copy, concepts: selectedConcepts(), infographic_concepts: selectedInfoConcepts(), infographic_color_theme: $('infoTheme')?.value || 'dark_lineart_city', infographic_layout_concept: $('infoLayout')?.value || 'photo_fullbleed', infographic_photo_accent: $('infoPhotoAccent')?.checked ?? true, infographic_custom_color: $('infoCustomColor')?.value || '', image_parallel_workers: Number($('infoWorkers')?.value || 2) }; }
+function payload(engine){ return { stock_name: $('stockName').value.trim(), stock_code: $('stockCode').value.trim(), format_name: $('formatName').value, custom_topic: $('customTopic').value.trim(), output_dir: $('outputDir').value, engine: engine || 'chain', raw_data: lastData.raw_data, script: lastData.script, thumbnail_copy: lastData.thumbnail_copy, concepts: selectedConcepts(), infographic_concepts: selectedInfoConcepts(), infographic_color_theme: $('infoTheme')?.value || 'dark_lineart_city', infographic_layout_concept: $('infoLayout')?.value || 'photo_fullbleed', infographic_photo_accent: $('infoPhotoAccent')?.checked ?? true, infographic_custom_color: $('infoCustomColor')?.value || '', image_parallel_workers: Number($('infoWorkers')?.value || 2), voice_id: $('voiceId')?.value.trim() || '', voice_model: $('voiceModel')?.value || 'eleven_multilingual_v2', voice_parallel_workers: Number($('voiceWorkers')?.value || 2), voice_stability: Number($('voiceStability')?.value || 0.42), voice_similarity: Number($('voiceSimilarity')?.value || 0.82), voice_style: Number($('voiceStyle')?.value || 0.22) }; }
 async function api(path, body){ const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); const j=await r.json(); if(!j.ok) throw new Error(j.error||'요청 실패'); return j; }
 async function startJob(path, body){
   if(currentJob) return;
@@ -188,7 +188,7 @@ function handleResult(job){
   if(Array.isArray(r.items)){ lastData.thumbnail_images=r.items; renderGallery(r.items); $('thumbOut').value = JSON.stringify(r,null,2); }
   if(Array.isArray(r.infographic_concepts)){ lastData.infographic_concepts=r.infographic_concepts; renderInfoConcepts(r.infographic_concepts); $('thumbOut').value = JSON.stringify(r.infographic_concepts,null,2); }
   if(Array.isArray(r.infographic_items)){ lastData.infographic_slides=r.infographic_items; renderInfoGallery(r.infographic_items); $('thumbOut').value = JSON.stringify(r,null,2); }
-  if(Array.isArray(r.voice_items)){ lastData.voice_items=r.voice_items; }
+  if(Array.isArray(r.voice_items)){ lastData.voice_items=r.voice_items; renderVoiceItems(r.voice_items, r); }
   if(r.package){ lastData.full_package=r.package; }
   if(Array.isArray(r.results)){ $('thumbOut').value = JSON.stringify(r,null,2); }
   if(r.summary){ renderPackageSummary(r.summary); }
@@ -201,15 +201,16 @@ function renderPackageSummary(summary){
   const rawChars=Number(summary.raw_chars||0).toLocaleString();
   const scriptChars=Number(summary.script_chars||0).toLocaleString();
   const thumbCount=Number(summary.thumbnail_image_count ?? summary.thumbnail_concept_count ?? 0);
-  const voiceCount=Number(summary.voice_count ?? summary.infographic_concept_count ?? 0);
+  const infoCount=Number(summary.infographic_image_count ?? summary.infographic_concept_count ?? 0);
+  const voiceCount=Number(summary.voice_count ?? 0);
   const thumbLabel = summary.thumbnail_image_count !== undefined ? '썸네일 이미지' : 'CTR 컨셉 후보';
-  const voiceLabel = summary.voice_count !== undefined ? 'mp3 음성 파일' : '인포 장면 후보';
   $('packageStatus').textContent = `${escapeHtml(summary.stock_name||'종목')} 준비 완료`;
   root.innerHTML = `
     <div class="package-card"><b>자료</b><strong>${rawChars}</strong><small>수집 데이터 글자</small></div>
     <div class="package-card"><b>대본</b><strong>${scriptChars}</strong><small>완성 대본 글자</small></div>
     <div class="package-card"><b>썸네일</b><strong>${thumbCount}개</strong><small>${thumbLabel}</small></div>
-    <div class="package-card"><b>음성/인포</b><strong>${voiceCount}개</strong><small>${voiceLabel}</small></div>
+    <div class="package-card"><b>인포그래픽</b><strong>${infoCount}개</strong><small>슬라이드 이미지</small></div>
+    <div class="package-card"><b>음성</b><strong>${voiceCount}개</strong><small>ElevenLabs mp3</small></div>
   `;
   $('packageFolder').textContent = summary.package_dir ? `출고 폴더: ${summary.package_dir}` : '';
   if(Array.isArray(summary.next_steps)){
@@ -295,6 +296,22 @@ function renderInfoGallery(items){
     </div>`;
   }).join('');
 }
+function renderVoiceItems(items, meta={}){
+  const root=$('voiceGallery');
+  const status=$('voiceStatus');
+  if(!root) return;
+  if(!items.length){
+    root.innerHTML='<div class="empty-card">생성된 음성 파일이 없습니다.</div>';
+    if(status) status.textContent=meta.error||'음성 생성 결과가 없습니다.';
+    return;
+  }
+  root.innerHTML=items.map((item,idx)=>`<div class="voice-card">
+    <div><b>음성 파트 ${idx+1}</b><span>${Number(item.chars||0).toLocaleString()}자 · ${escapeHtml(item.model||'ElevenLabs')}</span></div>
+    <audio controls preload="none" src="${escapeHtml(item.url||'')}"></audio>
+    ${item.url?`<a href="${escapeHtml(item.url)}" target="_blank">파일 열기</a>`:''}
+  </div>`).join('');
+  if(status) status.textContent=`${items.length}개 파트 생성 완료${meta.error?' · 일부 오류 있음':''}`;
+}
 async function loadConfig(){
   const r=await fetch('/api/config'); const j=await r.json(); if(!j.ok) throw new Error(j.error||'설정 로드 실패');
   const preset=$('preset'); preset.innerHTML=''; Object.entries(j.presets).forEach(([name,code])=>{ const o=document.createElement('option'); o.value=name; o.textContent=name; o.dataset.code=code; preset.appendChild(o); });
@@ -318,6 +335,7 @@ $('thumbConceptBtn').onclick=()=>startJob('/api/thumbnail-concepts', {...payload
 $('thumbImgBtn').onclick=()=>startJob('/api/thumbnail-images', {...payload(), count:Math.max(1, selectedConcepts().length || 3)});
 $('infoConceptBtn').onclick=()=>startJob('/api/infographic-concepts', {...payload(), count:6});
 $('infoImgBtn').onclick=()=>startJob('/api/infographic-slides', {...payload(), count:Math.max(1, selectedInfoConcepts().length || 4)});
+$('voiceBtn').onclick=()=>startJob('/api/voice', payload());
 $('openOutputBtn').onclick=()=>api('/api/open-output',{}).then(r=>log('폴더 열기: '+r.path)).catch(e=>showToast(e.message,'error'));
 $('selectAllConcepts').onclick=()=>{ lastData.thumbnail_concepts=(lastData.thumbnail_concepts||[]).map(c=>({...c,selected:true})); renderConcepts(lastData.thumbnail_concepts); };
 $('clearConcepts').onclick=()=>{ lastData.thumbnail_concepts=(lastData.thumbnail_concepts||[]).map(c=>({...c,selected:false})); renderConcepts(lastData.thumbnail_concepts); };

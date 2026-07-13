@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 import re
+import json
 import requests
 import threading
 import time
@@ -45,6 +46,8 @@ def _prime_legacy_runtime_config():
         "KRX_ID", "KRX_PW", "DART_API_KEY",
         "OPENAI_API_KEY", "OPENAI_TEXT_MODEL", "OPENAI_IMAGE_MODEL", "OPENAI_MAX_OUTPUT_TOKENS",
         "GEMINI_API_KEY", "GEMINI_TEXT_MODEL",
+        "ELEVENLABS_API_KEY", "ELEVEN_API_KEY", "ELEVENLABS_VOICE_ID", "ELEVEN_VOICE_ID",
+        "ELEVENLABS_MODEL", "ELEVENLABS_STABILITY", "ELEVENLABS_SIMILARITY", "ELEVENLABS_STYLE",
         "BATCH_ENGINE_MODE", "BATCH_PARALLEL_WORKERS",
     }
     local_values = _read_simple_config(ROOT / "config.txt")
@@ -288,6 +291,11 @@ def _thumbnail_copy(job_id: str, payload: Dict[str, Any]):
 def _path_to_output_url(path: str | None) -> str | None:
     if not path:
         return None
+    try:
+        p = Path(path).resolve()
+        return "/api/output-file?path=" + quote(str(p))
+    except Exception:
+        return None
 
 
 def _safe_part(value: str, limit: int = 42) -> str:
@@ -349,36 +357,37 @@ def _chunk_for_tts(text: str, limit: int = 3200) -> List[str]:
     return chunks or ([source] if source else [])
 
 
-def _generate_voice_files(script: str, package_dir: Path, stock_name: str, job_id: str):
+def _generate_voice_files(script: str, package_dir: Path, stock_name: str, job_id: str, options: Dict[str, Any] | None = None):
     chunks = _chunk_for_tts(script)
     if not chunks:
         return {"items": [], "error": "음성으로 만들 대본이 없습니다."}
 
     cfg = getattr(mr, "_cfg", {}) or {}
+    options = options or {}
     api_key = cfg.get("ELEVENLABS_API_KEY") or cfg.get("ELEVEN_API_KEY") or os.environ.get("ELEVENLABS_API_KEY") or os.environ.get("ELEVEN_API_KEY")
     voice_id = (
-        cfg.get("ELEVENLABS_VOICE_ID")
+        options.get("voice_id")
+        or cfg.get("ELEVENLABS_VOICE_ID")
         or cfg.get("ELEVEN_VOICE_ID")
         or os.environ.get("ELEVENLABS_VOICE_ID")
         or os.environ.get("ELEVEN_VOICE_ID")
         or "21m00Tcm4TlvDq8ikWAM"
     )
-    model_name = cfg.get("ELEVENLABS_MODEL") or os.environ.get("ELEVENLABS_MODEL") or "eleven_multilingual_v2"
-    stability = float(cfg.get("ELEVENLABS_STABILITY") or os.environ.get("ELEVENLABS_STABILITY") or 0.42)
-    similarity = float(cfg.get("ELEVENLABS_SIMILARITY") or os.environ.get("ELEVENLABS_SIMILARITY") or 0.82)
-    style = float(cfg.get("ELEVENLABS_STYLE") or os.environ.get("ELEVENLABS_STYLE") or 0.22)
+    model_name = options.get("voice_model") or cfg.get("ELEVENLABS_MODEL") or os.environ.get("ELEVENLABS_MODEL") or "eleven_multilingual_v2"
+    stability = float(options.get("voice_stability") or cfg.get("ELEVENLABS_STABILITY") or os.environ.get("ELEVENLABS_STABILITY") or 0.42)
+    similarity = float(options.get("voice_similarity") or cfg.get("ELEVENLABS_SIMILARITY") or os.environ.get("ELEVENLABS_SIMILARITY") or 0.82)
+    style = float(options.get("voice_style") or cfg.get("ELEVENLABS_STYLE") or os.environ.get("ELEVENLABS_STYLE") or 0.22)
 
     if not api_key:
         return {"items": [], "error": "config.txt에 ELEVENLABS_API_KEY를 입력하세요."}
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    output_format = cfg.get("ELEVENLABS_OUTPUT_FORMAT") or os.environ.get("ELEVENLABS_OUTPUT_FORMAT") or "mp3_44100_128"
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format={output_format}"
     headers = {
         "xi-api-key": api_key,
         "Content-Type": "application/json",
         "Accept": "audio/mpeg",
     }
-    items = []
-    for idx, chunk in enumerate(chunks, start=1):
-        _set_job(job_id, progress=min(94, 82 + idx), department="video", message=f"일레븐랩스 음성 생성중 {idx}/{len(chunks)}")
+    def make_chunk(idx: int, chunk: str):
         payload = {
             "text": chunk,
             "model_id": model_name,
@@ -392,23 +401,55 @@ def _generate_voice_files(script: str, package_dir: Path, stock_name: str, job_i
         response = requests.post(url, headers=headers, json=payload, timeout=180)
         if response.status_code >= 400:
             detail = response.text[:800]
-            return {"items": items, "error": f"ElevenLabs 음성 생성 실패: HTTP {response.status_code}\n{detail}"}
+            raise RuntimeError(f"ElevenLabs 음성 생성 실패: HTTP {response.status_code}\n{detail}")
         path = package_dir / f"03_음성_{idx:02d}_{_safe_part(stock_name, 16)}.mp3"
         path.write_bytes(response.content)
-        items.append({
+        return {
             "path": str(path),
             "url": _path_to_output_url(str(path)),
             "model": model_name,
             "voice": voice_id,
             "chars": len(chunk),
             "provider": "elevenlabs",
-        })
-    return {"items": items, "model": model_name, "voice": voice_id, "provider": "elevenlabs", "count": len(items)}
-    try:
-        p = Path(path).resolve()
-        return "/api/output-file?path=" + quote(str(p))
-    except Exception:
-        return None
+            "part": idx,
+        }
+
+    items = []
+    errors = []
+    workers = max(1, min(int(options.get("voice_parallel_workers") or cfg.get("ELEVENLABS_PARALLEL_WORKERS") or 2), 3, len(chunks)))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(make_chunk, idx, chunk): idx for idx, chunk in enumerate(chunks, start=1)}
+        done_count = 0
+        for future in as_completed(futures):
+            done_count += 1
+            idx = futures[future]
+            try:
+                items.append(future.result())
+                _set_job(job_id, progress=min(94, 80 + done_count * 3), department="video", message=f"일레븐랩스 음성 {done_count}/{len(chunks)} 완료")
+            except Exception as exc:  # noqa: BLE001 - 나머지 파트는 계속 생성
+                errors.append(f"파트 {idx}: {exc}")
+    items.sort(key=lambda item: int(item.get("part") or 0))
+    result = {"items": items, "model": model_name, "voice": voice_id, "provider": "elevenlabs", "count": len(items), "output_format": output_format}
+    if errors:
+        result["error"] = "\n".join(errors)
+    return result
+
+
+def _voice_export(job_id: str, payload: Dict[str, Any]):
+    script = payload.get("script") or _last.get("script") or ""
+    stock_name = (payload.get("stock_name") or _last.get("stock_name") or "종목").strip()
+    if not str(script).strip():
+        raise ValueError("음성으로 만들 완성 대본이 없습니다.")
+    base_dir = Path(payload.get("output_dir") or OUTPUT_DIR).resolve()
+    voice_dir = base_dir / f"{datetime.now().strftime('%Y-%m-%d_%H%M')}_{_safe_part(stock_name, 18)}_음성"
+    voice_dir.mkdir(parents=True, exist_ok=True)
+    _set_job(job_id, status="running", progress=12, department="video", message="일레븐랩스 음성 작업 준비")
+    result = _generate_voice_files(script, voice_dir, stock_name, job_id, payload)
+    result["voice_items"] = result.get("items", [])
+    result["package_dir"] = str(voice_dir)
+    with _lock:
+        _last.update({"voice_items": result.get("items", [])})
+    return result
 
 
 def _thumbnail_concepts(job_id: str, payload: Dict[str, Any]):
@@ -809,12 +850,31 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
     if thumbnail_copy and not Path(thumb_copy_path).exists():
         thumb_copy_path = _write_text_file(package_dir / "02_썸네일문구.txt", thumbnail_copy)
 
+    info_payload = {
+        "stock_name": stock_name,
+        "script": script,
+        "output_dir": str(package_dir),
+        "count": int(payload.get("infographic_count") or 4),
+        "infographic_color_theme": payload.get("infographic_color_theme") or "dark_lineart_city",
+        "infographic_custom_color": payload.get("infographic_custom_color") or "",
+        "infographic_layout_concept": payload.get("infographic_layout_concept") or "photo_fullbleed",
+        "infographic_photo_accent": _as_bool(payload.get("infographic_photo_accent"), True),
+        "image_parallel_workers": int(payload.get("image_parallel_workers") or 2),
+    }
+    _set_job(job_id, progress=61, department="design", message="4/7 인포그래픽 장면 기획")
+    info_concepts_result = _infographic_concepts(job_id, info_payload)
+    infographic_concepts = info_concepts_result.get("infographic_concepts", [])
+    info_concepts_path = _write_text_file(
+        package_dir / "03_인포그래픽_기획.json",
+        json.dumps(infographic_concepts, ensure_ascii=False, indent=2),
+    )
+
     _set_job(
         job_id,
-        progress=65,
+        progress=66,
         department="design",
         active_departments=["design", "video"],
-        message="4/6 디자인실과 영상팀이 동시에 출고 작업을 시작합니다",
+        message="5/7 썸네일·인포그래픽·음성을 병렬로 제작합니다",
     )
 
     def run_thumbnail_image() -> Dict[str, Any]:
@@ -832,24 +892,35 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
             return {"items": [], "error": str(exc)}
 
     def run_voice_export() -> Dict[str, Any]:
-        result = _generate_voice_files(script, package_dir, stock_name, job_id)
+        result = _generate_voice_files(script, package_dir, stock_name, job_id, payload)
         if result.get("error"):
             _write_text_file(package_dir / "음성_생성실패.txt", result.get("error", ""))
         return result
 
+    def run_infographic_export() -> Dict[str, Any]:
+        try:
+            slide_payload = dict(info_payload)
+            slide_payload["infographic_concepts"] = infographic_concepts[:4]
+            return _infographic_slides(job_id, slide_payload)
+        except Exception as exc:  # noqa: BLE001 - 다른 출고물은 계속 진행
+            _write_text_file(package_dir / "인포그래픽_생성실패.txt", str(exc))
+            return {"infographic_items": [], "error": str(exc)}
+
     thumbnail_result = {"items": [], "error": None}
     voice_result = {"items": [], "error": None}
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    infographic_result = {"infographic_items": [], "error": None}
+    with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {
             executor.submit(run_thumbnail_image): "thumbnail",
             executor.submit(run_voice_export): "voice",
+            executor.submit(run_infographic_export): "infographic",
         }
         pending_labels = set(futures.values())
         for future in as_completed(futures):
             label = futures[future]
             pending_labels.discard(label)
             remaining_departments = [
-                dept for key, dept in (("thumbnail", "design"), ("voice", "video"))
+                dept for key, dept in (("thumbnail", "design"), ("infographic", "design"), ("voice", "video"))
                 if key in pending_labels
             ]
             if label == "thumbnail":
@@ -861,7 +932,7 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
                     active_departments=remaining_departments,
                     message="디자인실 썸네일 이미지 완료 · 영상팀은 계속 작업중",
                 )
-            else:
+            elif label == "voice":
                 voice_result = future.result()
                 _set_job(
                     job_id,
@@ -870,8 +941,19 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
                     active_departments=remaining_departments,
                     message="영상팀 음성 파일 완료 · 디자인실은 계속 작업중",
                 )
+            else:
+                infographic_result = future.result()
+                _set_job(
+                    job_id,
+                    progress=88,
+                    department="design",
+                    active_departments=remaining_departments,
+                    message="인포그래픽 슬라이드 완료 · 남은 출고 작업 진행중",
+                )
 
-    _set_job(job_id, progress=96, department="shipping", message="6/6 출고 목록 정리")
+    infographic_items = infographic_result.get("infographic_items", []) or []
+    infographic_error = infographic_result.get("error") or ("\n".join(infographic_result.get("errors", [])) if infographic_result.get("errors") else None)
+    _set_job(job_id, progress=96, department="shipping", message="7/7 출고 목록 정리")
     manifest = {
         "stock_name": stock_name,
         "stock_code": stock_code,
@@ -883,6 +965,10 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
         "thumbnail_copy_path": thumb_copy_path,
         "thumbnail_items": thumbnail_result.get("items", []),
         "thumbnail_error": thumbnail_result.get("error"),
+        "infographic_concepts_path": info_concepts_path,
+        "infographic_concepts": infographic_concepts,
+        "infographic_items": infographic_items,
+        "infographic_error": infographic_error,
         "voice_items": voice_result.get("items", []),
         "voice_error": voice_result.get("error"),
         "topic_covered": script_stats.get("topic_covered"),
@@ -898,8 +984,10 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
             f"대본: {script_path}",
             f"썸네일 문구: {thumb_copy_path}",
             f"썸네일 이미지: {len(thumbnail_result.get('items', []) or [])}개",
+            f"인포그래픽 이미지: {len(infographic_items)}개",
             f"음성: {len(voice_result.get('items', []) or [])}개",
             f"썸네일 오류: {thumbnail_result.get('error') or '-'}",
+            f"인포그래픽 오류: {infographic_error or '-'}",
             f"음성 오류: {voice_result.get('error') or '-'}",
         ]),
     )
@@ -910,6 +998,8 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
             "script": script,
             "thumbnail_copy": thumbnail_copy,
             "thumbnail_images": thumbnail_result.get("items", []),
+            "infographic_concepts": infographic_concepts,
+            "infographic_slides": infographic_items,
             "full_package": manifest,
             "stock_name": stock_name,
             "stock_code": stock_code,
@@ -923,15 +1013,16 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
         "script_chars": len(script),
         "topic_covered": script_stats.get("topic_covered"),
         "thumbnail_concept_count": 0,
-        "infographic_concept_count": 0,
+        "infographic_concept_count": len(infographic_concepts),
+        "infographic_image_count": len(infographic_items),
         "thumbnail_image_count": len(thumbnail_result.get("items", []) or []),
         "voice_count": len(voice_result.get("items", []) or []),
         "package_dir": str(package_dir),
         "script_path": script_path,
         "thumbnail_copy_path": thumb_copy_path,
         "next_steps": [
-            "출고 폴더에서 대본, 썸네일 이미지, 음성 파일을 확인하세요.",
-            "썸네일이나 음성이 실패했다면 실패 메모 파일을 확인하세요.",
+            "출고 폴더에서 대본, 썸네일, 인포그래픽, 음성 파일을 확인하세요.",
+            "일부 생성이 실패했다면 해당 실패 메모 파일을 확인하세요.",
         ],
     }
     return {
@@ -942,6 +1033,8 @@ def _full_package(job_id: str, payload: Dict[str, Any]):
         "path": script_path,
         "thumbnail_copy": thumbnail_copy,
         "items": thumbnail_result.get("items", []),
+        "infographic_concepts": infographic_concepts,
+        "infographic_items": infographic_items,
         "voice_items": voice_result.get("items", []),
         "package": manifest,
     }
@@ -1042,6 +1135,13 @@ def api_infographic_concepts():
 def api_infographic_slides():
     payload = request.get_json(force=True, silent=True) or {}
     job_id = _start_job("infographic_slides", "인포그래픽 이미지", _infographic_slides, payload)
+    return _json_ok(job_id=job_id)
+
+
+@app.route("/api/voice", methods=["POST"])
+def api_voice():
+    payload = request.get_json(force=True, silent=True) or {}
+    job_id = _start_job("voice", "일레븐랩스 음성", _voice_export, payload)
     return _json_ok(job_id=job_id)
 
 
