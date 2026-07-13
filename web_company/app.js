@@ -18,6 +18,45 @@ const deptDefaultTalk = {
   video: "일레븐랩스 음성 준비",
   shipping: "한 폴더로 포장합니다"
 };
+const deptSceneProps = {
+  planning: ['화이트보드','아이디어 보드'],
+  research: ['데이터 서버','뉴스 모니터'],
+  writing: ['원고 데스크','녹음 부스'],
+  review: ['검수 모니터','팩트 보드'],
+  design: ['드로잉 태블릿','컬러 보드'],
+  video: ['편집 콘솔','오디오 랙'],
+  shipping: ['출고 박스','파일 서버']
+};
+function buildTycoonOffice(){
+  let totalCrew=0;
+  document.querySelectorAll('.office-room').forEach(room=>{
+    if(room.querySelector('.tycoon-scene')) return;
+    const dept=room.dataset.dept||'planning';
+    const names=[...room.querySelectorAll('.crew-list em')].map(el=>el.textContent.trim()).filter(Boolean);
+    const crew=Math.max(2,Number(room.dataset.crew||names.length||2));
+    totalCrew+=crew;
+    while(names.length<crew) names.push(`팀원 ${names.length+1}`);
+    const props=deptSceneProps[dept]||['업무 데스크','자료 보드'];
+    const agents=names.slice(0,4).map((name,index)=>`<span class="pixel-agent agent-${index+1}" title="${escapeHtml(name)}"><i class="pixel-head"></i><i class="pixel-body"></i><i class="pixel-legs"></i><b>${escapeHtml(name)}</b></span>`).join('');
+    const scene=document.createElement('div');
+    scene.className='tycoon-scene';
+    scene.setAttribute('aria-label',`${room.querySelector('h3')?.textContent||'부서'} 사무실`);
+    scene.innerHTML=`
+      <span class="room-window"><i></i><i></i></span>
+      <span class="pixel-board"><b>${escapeHtml(props[1])}</b></span>
+      <span class="pixel-desk desk-one"><i class="pixel-monitor"></i><i class="desk-chair"></i></span>
+      <span class="pixel-desk desk-two"><i class="pixel-monitor"></i><i class="desk-chair"></i></span>
+      <span class="pixel-prop"><b>${escapeHtml(props[0])}</b></span>
+      <span class="pixel-plant"><i></i></span>
+      <span class="pixel-cabinet"><i></i><i></i></span>
+      <div class="pixel-agents">${agents}</div>
+      <span class="task-packet"></span>`;
+    const head=room.querySelector('.room-head');
+    head?.insertAdjacentElement('afterend',scene);
+  });
+  if($('totalCrewCount')) $('totalCrewCount').textContent=String(totalCrew);
+}
+function updateOfficeClock(){ if($('officeClock')) $('officeClock').textContent=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}); }
 function log(msg){ const el=$("log"); const t=new Date().toLocaleTimeString(); el.innerHTML = `<div>[${t}] ${escapeHtml(msg)}</div>` + el.innerHTML; }
 function escapeHtml(s){return String(s||"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));}
 function shortTask(msg, fallback){
@@ -50,6 +89,7 @@ function setDept(active, done=[], message=''){
   },0);
   if($('activeTeamCount')) $('activeTeamCount').textContent=`${activeList.length}개 팀`;
   if($('activeCrewCount')) $('activeCrewCount').textContent=`${activeCrew}명`;
+  if($('workingCrewCount')) $('workingCrewCount').textContent=String(activeCrew);
   if($('stageName')) $('stageName').textContent=activeList.length ? activeList.map(id=>document.querySelector(`.office-room[data-dept="${id}"] h3`)?.textContent||id).join(' + ') : (done.length ? '출고 완료' : '의뢰 대기');
 }
 function doneBefore(active){ const i=deptOrder.indexOf(active); return i>0 ? deptOrder.slice(0,i) : []; }
@@ -260,4 +300,7 @@ document.querySelectorAll('.topic-chip').forEach(chip=>{
 });
 loadConfig().catch(e=>showToast(e.message,'error'));
 updateTopicBrief();
+buildTycoonOffice();
+updateOfficeClock();
+setInterval(updateOfficeClock,30000);
 setDept(null,[]);
