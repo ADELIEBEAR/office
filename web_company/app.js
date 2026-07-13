@@ -36,6 +36,28 @@ const deptSprites = {
   video: [6, 9],
   shipping: [5]
 };
+const ambientCrew = [
+  { cls: 'ambient-desk desk-a', sprite: 2, role: '시장 데이터 정리' },
+  { cls: 'ambient-desk desk-b', sprite: 9, role: '원고 자료 정리' },
+  { cls: 'ambient-presenter', sprite: 3, role: '회의 자료 발표' },
+  { cls: 'ambient-coffee', sprite: 4, role: '커피 휴식' },
+  { cls: 'ambient-phone', sprite: 6, role: '전화 업무' },
+  { cls: 'ambient-runner', sprite: 5, role: '서류 전달' },
+  { cls: 'ambient-greeter', sprite: 8, role: '방문자 안내' },
+  { cls: 'ambient-celebrate', sprite: 1, role: '작업 완료 확인' }
+];
+
+function buildAmbientCrew(){
+  const map=$('companyMap');
+  if(!map || map.querySelector('.office-ambient-crew')) return;
+  const layer=document.createElement('div');
+  layer.className='office-ambient-crew';
+  layer.setAttribute('aria-hidden','true');
+  layer.innerHTML=ambientCrew.map((worker,index)=>
+    `<i class="ambient-worker ${worker.cls} sprite-${worker.sprite} ambient-${index+1}" title="${escapeHtml(worker.role)}"></i>`
+  ).join('');
+  map.appendChild(layer);
+}
 function buildTycoonOffice(){
   let totalCrew=0;
   document.querySelectorAll('.office-room').forEach(room=>{
@@ -314,6 +336,7 @@ document.querySelectorAll('.topic-chip').forEach(chip=>{
 loadConfig().catch(e=>showToast(e.message,'error'));
 updateTopicBrief();
 buildTycoonOffice();
+buildAmbientCrew();
 updateOfficeClock();
 setInterval(updateOfficeClock,30000);
 setDept(null,[]);

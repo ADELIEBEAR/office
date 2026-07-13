@@ -1870,3 +1870,96 @@ button.primary,.autopilot-btn {
   .company-map .video{left:62%;top:70%}
   .company-map .shipping{right:1%;top:27%}
 }
+
+/* Background office life — 부서 카드 밖에서 움직이는 보조 직원 */
+.office-ambient-crew {
+  position:absolute;
+  z-index:4;
+  inset:53px 0 0;
+  overflow:hidden;
+  pointer-events:none;
+}
+.ambient-worker {
+  position:absolute;
+  display:block;
+  width:58px;
+  height:76px;
+  background-color:transparent;
+  background-image:url('assets/ai_crew_actions_cutout.png');
+  background-repeat:no-repeat;
+  background-size:300% 300%;
+  filter:drop-shadow(0 5px 3px rgba(65,40,21,.2));
+  opacity:.88;
+  transform-origin:50% 100%;
+  animation:ambientIdle 2.7s ease-in-out infinite alternate;
+}
+.ambient-worker.sprite-1 { background-position:0 0; }
+.ambient-worker.sprite-2 { background-position:50% 0; }
+.ambient-worker.sprite-3 { background-position:100% 0; }
+.ambient-worker.sprite-4 { background-position:0 50%; }
+.ambient-worker.sprite-5 { background-position:50% 50%; }
+.ambient-worker.sprite-6 { background-position:100% 50%; }
+.ambient-worker.sprite-7 { background-position:0 100%; }
+.ambient-worker.sprite-8 { background-position:50% 100%; }
+.ambient-worker.sprite-9 { background-position:100% 100%; }
+
+.ambient-1 { left:7.5%; top:54%; animation-delay:-.4s; }
+.ambient-2 { left:31%; top:53%; animation-delay:-1.2s; }
+.ambient-3 { left:65%; top:18%; animation-delay:-.8s; }
+.ambient-4 { right:4%; top:42%; animation-delay:-1.7s; }
+.ambient-5 { right:15%; top:63%; animation-delay:-2.1s; }
+.ambient-6 { left:52%; top:70%; animation-delay:-.2s; }
+.ambient-7 { right:2%; top:76%; animation-delay:-1.4s; }
+.ambient-8 { left:44%; top:37%; animation-delay:-2.4s; opacity:.72; }
+
+.is-running .ambient-desk { animation:ambientTyping .48s steps(2) infinite alternate; }
+.is-running .ambient-presenter { animation:ambientPresent 1.15s ease-in-out infinite alternate; }
+.is-running .ambient-coffee { animation:ambientSip 2.2s ease-in-out infinite; }
+.is-running .ambient-phone { animation:ambientPhone 1.35s ease-in-out infinite alternate; }
+.is-running .ambient-runner { animation:ambientCorridorRun 12s linear infinite; }
+.is-running .ambient-greeter { animation:ambientGreeting 2.4s ease-in-out infinite; }
+.is-running .ambient-celebrate { animation:ambientCelebrate .75s steps(2) infinite alternate; }
+
+@keyframes ambientIdle {
+  from { transform:translateY(0) rotate(-.35deg); }
+  to { transform:translateY(-2px) rotate(.35deg); }
+}
+@keyframes ambientTyping {
+  from { transform:translate(0,0) scale(1); }
+  to { transform:translate(1px,-2px) scale(1.015); }
+}
+@keyframes ambientPresent {
+  from { transform:rotate(-1.5deg) translateY(0); }
+  to { transform:rotate(1.5deg) translateY(-3px); }
+}
+@keyframes ambientSip {
+  0%,100% { transform:translateY(0) rotate(0); }
+  45% { transform:translateY(-2px) rotate(-2deg); }
+  60% { transform:translateY(-2px) rotate(1deg); }
+}
+@keyframes ambientPhone {
+  from { transform:translateY(0) rotate(-1deg); }
+  to { transform:translateY(-3px) rotate(1deg); }
+}
+@keyframes ambientCorridorRun {
+  0% { left:46%; transform:translateY(0) scaleX(1); opacity:0; }
+  5% { opacity:.9; }
+  46% { left:73%; transform:translateY(-5px) scaleX(1); opacity:.9; }
+  50% { left:73%; transform:translateY(-5px) scaleX(-1); }
+  94% { left:46%; transform:translateY(0) scaleX(-1); opacity:.9; }
+  100% { left:46%; transform:translateY(0) scaleX(-1); opacity:0; }
+}
+@keyframes ambientGreeting {
+  0%,75%,100% { transform:rotate(0) translateY(0); }
+  86% { transform:rotate(2deg) translateY(2px); }
+  93% { transform:rotate(-2deg) translateY(2px); }
+}
+@keyframes ambientCelebrate {
+  from { transform:translateY(0) scale(1); }
+  to { transform:translateY(-4px) scale(1.025); }
+}
+
+@media(max-width:1150px){
+  .ambient-worker{width:50px;height:68px;opacity:.78}
+  .ambient-7,.ambient-8{display:none}
+}
